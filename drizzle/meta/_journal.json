@@ -1,0 +1,125 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785339611652,
+      "tag": "0000_fair_cassandra_nova",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785339620546,
+      "tag": "0001_personal_team_on_signup",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785340916964,
+      "tag": "0002_membership_helper_functions",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785340929579,
+      "tag": "0003_thin_devos",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785340969718,
+      "tag": "0004_authenticated_role_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785341011955,
+      "tag": "0005_service_role_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785341248250,
+      "tag": "0006_sleepy_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785342121039,
+      "tag": "0007_exotic_black_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785342147140,
+      "tag": "0008_asset_storage_bucket",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785343427029,
+      "tag": "0009_aberrant_micromax",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785344974431,
+      "tag": "0010_concerned_madrox",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785346304903,
+      "tag": "0011_giant_puff_adder",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785347625255,
+      "tag": "0012_sticky_smiling_tiger",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785347647761,
+      "tag": "0013_enable_realtime_annotations_comments",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1785425140159,
+      "tag": "0014_shiny_network",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1785425774289,
+      "tag": "0015_stormy_imperial_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1785426636076,
+      "tag": "0016_broad_king_bedlam",
+      "breakpoints": true
+    }
+  ]
+}

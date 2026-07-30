@@ -1,0 +1,229 @@
+import Link from "next/link";
+import { headers } from "next/headers";
+import { notFound } from "next/navigation";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import { authUsers } from "drizzle-orm/supabase";
+import { ArrowLeft } from "lucide-react";
+
+import { getAssetSignedUrls } from "@/lib/assets/signed-url";
+import type { ElementMapEntry } from "@/lib/annotations/hit-test";
+import { getCurrentUser, getCurrentTeam } from "@/lib/auth/team";
+import { db } from "@/lib/db";
+import {
+  annotations,
+  assets,
+  captures,
+  comments,
+  comparisons,
+  pages,
+  projects,
+  shareLinks,
+  teamMembers,
+} from "@/lib/db/schema";
+import { env } from "@/lib/env";
+import { Button } from "@/components/ui/button";
+import { ComparisonWorkspace } from "@/components/comparison/comparison-workspace";
+import { DeleteComparisonButton } from "@/components/comparisons/delete-comparison-button";
+import { ExportPdfButton } from "@/components/comparisons/export-pdf-button";
+import { RefreshCaptureButton } from "@/components/comparisons/refresh-capture-button";
+import { ShareLinkDialog } from "@/components/comparisons/share-link-dialog";
+import { Share2 } from "lucide-react";
+
+export default async function ComparisonDetailPage({
+  params,
+}: {
+  params: Promise<{ projectSlug: string; pageId: string; comparisonId: string }>;
+}) {
+  const { projectSlug, pageId, comparisonId } = await params;
+  const { team, role } = await getCurrentTeam();
+  const canEdit = role !== "viewer";
+  const user = await getCurrentUser();
+
+  const designAssets = alias(assets, "design_assets");
+  const captureAssets = alias(assets, "capture_assets");
+
+  const [row] = await db
+    .select({
+      comparison: comparisons,
+      page: pages,
+      design: designAssets,
+      capture: captureAssets,
+    })
+    .from(comparisons)
+    .innerJoin(pages, eq(comparisons.pageId, pages.id))
+    .innerJoin(projects, eq(pages.projectId, projects.id))
+    .innerJoin(designAssets, eq(comparisons.designAssetId, designAssets.id))
+    .innerJoin(captureAssets, eq(comparisons.captureAssetId, captureAssets.id))
+    .where(
+      and(
+        eq(comparisons.id, comparisonId),
+        eq(pages.id, pageId),
+        eq(projects.slug, projectSlug),
+        eq(projects.teamId, team.id)
+      )
+    )
+    .limit(1);
+
+  if (!row || !row.design.width || !row.design.height || !row.capture.width || !row.capture.height || !user) {
+    notFound();
+  }
+
+  const [captureRow] = await db
+    .select({ elementMap: captures.elementMap })
+    .from(captures)
+    .where(eq(captures.assetId, row.capture.id))
+    .limit(1);
+
+  const signedUrls = await getAssetSignedUrls([row.design.storagePath, row.capture.storagePath], {
+    thumbnail: false,
+  });
+  const designUrl = signedUrls.get(row.design.storagePath);
+  const captureUrl = signedUrls.get(row.capture.storagePath);
+
+  if (!designUrl || !captureUrl) {
+    notFound();
+  }
+
+  const [latestCapture] = await db
+    .select({ assetId: captures.assetId, capturedAt: captures.capturedAt })
+    .from(captures)
+    .innerJoin(assets, eq(captures.assetId, assets.id))
+    .where(and(eq(assets.pageId, pageId), eq(captures.status, "ready")))
+    .orderBy(desc(captures.createdAt))
+    .limit(1);
+  const hasNewerCapture = latestCapture && latestCapture.assetId !== row.capture.id;
+
+  const annotationRows = await db
+    .select({ annotation: annotations, authorEmail: authUsers.email })
+    .from(annotations)
+    .innerJoin(authUsers, eq(annotations.createdBy, authUsers.id))
+    .where(eq(annotations.comparisonId, comparisonId))
+    .orderBy(asc(annotations.createdAt));
+
+  const annotationIds = annotationRows.map((r) => r.annotation.id);
+  const commentAuthor = alias(authUsers, "comment_author");
+  const commentRows =
+    annotationIds.length === 0
+      ? []
+      : await db
+          .select({ comment: comments, authorEmail: commentAuthor.email })
+          .from(comments)
+          .leftJoin(commentAuthor, eq(comments.createdBy, commentAuthor.id))
+          .where(inArray(comments.annotationId, annotationIds))
+          .orderBy(asc(comments.createdAt));
+
+  const initialAnnotations = annotationRows.map((r, index) => ({
+    id: r.annotation.id,
+    target: r.annotation.target,
+    xRatio: Number(r.annotation.xRatio),
+    yPx: r.annotation.yPx,
+    status: r.annotation.status,
+    number: index + 1,
+    authorId: r.annotation.createdBy,
+    authorEmail: r.authorEmail ?? "unknown",
+    comments: commentRows
+      .filter((c) => c.comment.annotationId === r.annotation.id)
+      .map((c) => ({
+        id: c.comment.id,
+        body: c.comment.body,
+        createdBy: c.comment.createdBy,
+        authorEmail: c.authorEmail ?? c.comment.guestName ?? "Anonymous",
+        createdAt: c.comment.createdAt.toISOString(),
+        editedAt: c.comment.editedAt?.toISOString() ?? null,
+      })),
+  }));
+
+  const teamMemberRows = await db
+    .select({ userId: teamMembers.userId, email: authUsers.email })
+    .from(teamMembers)
+    .innerJoin(authUsers, eq(teamMembers.userId, authUsers.id))
+    .where(eq(teamMembers.teamId, team.id));
+  const teamMemberOptions = teamMemberRows.map((m) => ({ id: m.userId, email: m.email ?? "unknown" }));
+
+  const shareLinkRows = await db
+    .select()
+    .from(shareLinks)
+    .where(eq(shareLinks.comparisonId, comparisonId))
+    .orderBy(desc(shareLinks.createdAt));
+  const headersList = await headers();
+  const host = headersList.get("host");
+  const protocol =
+    headersList.get("x-forwarded-proto") ??
+    (host?.startsWith("localhost") || host?.startsWith("127.0.0.1") ? "http" : "https");
+  const origin = host ? `${protocol}://${host}` : env.NEXT_PUBLIC_SITE_URL;
+  const shareLinkOptions = shareLinkRows.map((link) => ({
+    id: link.id,
+    url: `${origin}/share/${link.token}`,
+    allowAnonymousComments: link.allowAnonymousComments,
+    expiresAt: link.expiresAt?.toISOString() ?? null,
+  }));
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href={`/projects/${projectSlug}/${pageId}`}>
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">{row.comparison.name}</h1>
+            <p className="text-sm text-muted-foreground">{row.page.name}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {canEdit && hasNewerCapture ? (
+            <RefreshCaptureButton comparisonId={comparisonId} newCaptureAssetId={latestCapture.assetId} />
+          ) : null}
+          {canEdit ? (
+            <ShareLinkDialog
+              comparisonId={comparisonId}
+              existingLinks={shareLinkOptions}
+              trigger={
+                <Button variant="outline">
+                  <Share2 className="h-4 w-4" />
+                  Share
+                </Button>
+              }
+            />
+          ) : null}
+          <ExportPdfButton comparisonId={comparisonId} comparisonName={row.comparison.name} />
+          {canEdit ? (
+            <DeleteComparisonButton
+              projectSlug={projectSlug}
+              pageId={pageId}
+              comparisonId={comparisonId}
+              comparisonName={row.comparison.name}
+              trigger={<Button variant="outline">Delete comparison</Button>}
+            />
+          ) : null}
+        </div>
+      </div>
+
+      <ComparisonWorkspace
+        comparisonId={comparisonId}
+        design={{
+          src: designUrl,
+          width: row.design.width,
+          height: row.design.height,
+          label: "Design",
+        }}
+        live={{
+          src: captureUrl,
+          width: row.capture.width,
+          height: row.capture.height,
+          label: "Live",
+        }}
+        designAssetId={row.design.id}
+        captureAssetId={row.capture.id}
+        initialAnnotations={initialAnnotations}
+        elementMap={(captureRow?.elementMap as ElementMapEntry[] | null) ?? []}
+        currentUser={{ id: user.id, email: user.email ?? "unknown" }}
+        teamMembers={teamMemberOptions}
+        canModerate={canEdit}
+      />
+    </div>
+  );
+}

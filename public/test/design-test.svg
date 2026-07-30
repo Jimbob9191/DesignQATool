@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1200" viewBox="0 0 800 1200">
+  <rect width="800" height="1200" fill="#eef2ff"/>
+  <line x1="0" y1="0" x2="0" y2="1200" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="100" y1="0" x2="100" y2="1200" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="200" y1="0" x2="200" y2="1200" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="300" y1="0" x2="300" y2="1200" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="400" y1="0" x2="400" y2="1200" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="500" y1="0" x2="500" y2="1200" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="600" y1="0" x2="600" y2="1200" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="700" y1="0" x2="700" y2="1200" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="800" y1="0" x2="800" y2="1200" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="0" x2="800" y2="0" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="100" x2="800" y2="100" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="200" x2="800" y2="200" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="300" x2="800" y2="300" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="400" x2="800" y2="400" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="500" x2="800" y2="500" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="600" x2="800" y2="600" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="700" x2="800" y2="700" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="800" x2="800" y2="800" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="900" x2="800" y2="900" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="1000" x2="800" y2="1000" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="1100" x2="800" y2="1100" stroke="#c7d2fe" stroke-width="1"/>
+  <line x1="0" y1="1200" x2="800" y2="1200" stroke="#c7d2fe" stroke-width="1"/>
+  <text x="6" y="18" font-family="monospace" font-size="12" fill="#4338ca">0,0</text>
+  <text x="6" y="118" font-family="monospace" font-size="12" fill="#4338ca">0,100</text>
+  <text x="6" y="218" font-family="monospace" font-size="12" fill="#4338ca">0,200</text>
+  <text x="6" y="318" font-family="monospace" font-size="12" fill="#4338ca">0,300</text>
+  <text x="6" y="418" font-family="monospace" font-size="12" fill="#4338ca">0,400</text>
+  <text x="6" y="518" font-family="monospace" font-size="12" fill="#4338ca">0,500</text>
+  <text x="6" y="618" font-family="monospace" font-size="12" fill="#4338ca">0,600</text>
+  <text x="6" y="718" font-family="monospace" font-size="12" fill="#4338ca">0,700</text>
+  <text x="6" y="818" font-family="monospace" font-size="12" fill="#4338ca">0,800</text>
+  <text x="6" y="918" font-family="monospace" font-size="12" fill="#4338ca">0,900</text>
+  <text x="6" y="1018" font-family="monospace" font-size="12" fill="#4338ca">0,1000</text>
+  <text x="6" y="1118" font-family="monospace" font-size="12" fill="#4338ca">0,1100</text>
+  <text x="106" y="18" font-family="monospace" font-size="12" fill="#4338ca">100,0</text>
+  <text x="106" y="118" font-family="monospace" font-size="12" fill="#4338ca">100,100</text>
+  <text x="106" y="218" font-family="monospace" font-size="12" fill="#4338ca">100,200</text>
+  <text x="106" y="318" font-family="monospace" font-size="12" fill="#4338ca">100,300</text>
+  <text x="106" y="418" font-family="monospace" font-size="12" fill="#4338ca">100,400</text>
+  <text x="106" y="518" font-family="monospace" font-size="12" fill="#4338ca">100,500</text>
+  <text x="106" y="618" font-family="monospace" font-size="12" fill="#4338ca">100,600</text>
+  <text x="106" y="718" font-family="monospace" font-size="12" fill="#4338ca">100,700</text>
+  <text x="106" y="818" font-family="monospace" font-size="12" fill="#4338ca">100,800</text>
+  <text x="106" y="918" font-family="monospace" font-size="12" fill="#4338ca">100,900</text>
+  <text x="106" y="1018" font-family="monospace" font-size="12" fill="#4338ca">100,1000</text>
+  <text x="106" y="1118" font-family="monospace" font-size="12" fill="#4338ca">100,1100</text>
+  <text x="206" y="18" font-family="monospace" font-size="12" fill="#4338ca">200,0</text>
+  <text x="206" y="118" font-family="monospace" font-size="12" fill="#4338ca">200,100</text>
+  <text x="206" y="218" font-family="monospace" font-size="12" fill="#4338ca">200,200</text>
+  <text x="206" y="318" font-family="monospace" font-size="12" fill="#4338ca">200,300</text>
+  <text x="206" y="418" font-family="monospace" font-size="12" fill="#4338ca">200,400</text>
+  <text x="206" y="518" font-family="monospace" font-size="12" fill="#4338ca">200,500</text>
+  <text x="206" y="618" font-family="monospace" font-size="12" fill="#4338ca">200,600</text>
+  <text x="206" y="718" font-family="monospace" font-size="12" fill="#4338ca">200,700</text>
+  <text x="206" y="818" font-family="monospace" font-size="12" fill="#4338ca">200,800</text>
+  <text x="206" y="918" font-family="monospace" font-size="12" fill="#4338ca">200,900</text>
+  <text x="206" y="1018" font-family="monospace" font-size="12" fill="#4338ca">200,1000</text>
+  <text x="206" y="1118" font-family="monospace" font-size="12" fill="#4338ca">200,1100</text>
+  <text x="306" y="18" font-family="monospace" font-size="12" fill="#4338ca">300,0</text>
+  <text x="306" y="118" font-family="monospace" font-size="12" fill="#4338ca">300,100</text>
+  <text x="306" y="218" font-family="monospace" font-size="12" fill="#4338ca">300,200</text>
+  <text x="306" y="318" font-family="monospace" font-size="12" fill="#4338ca">300,300</text>
+  <text x="306" y="418" font-family="monospace" font-size="12" fill="#4338ca">300,400</text>
+  <text x="306" y="518" font-family="monospace" font-size="12" fill="#4338ca">300,500</text>
+  <text x="306" y="618" font-family="monospace" font-size="12" fill="#4338ca">300,600</text>
+  <text x="306" y="718" font-family="monospace" font-size="12" fill="#4338ca">300,700</text>
+  <text x="306" y="818" font-family="monospace" font-size="12" fill="#4338ca">300,800</text>
+  <text x="306" y="918" font-family="monospace" font-size="12" fill="#4338ca">300,900</text>
+  <text x="306" y="1018" font-family="monospace" font-size="12" fill="#4338ca">300,1000</text>
+  <text x="306" y="1118" font-family="monospace" font-size="12" fill="#4338ca">300,1100</text>
+  <text x="406" y="18" font-family="monospace" font-size="12" fill="#4338ca">400,0</text>
+  <text x="406" y="118" font-family="monospace" font-size="12" fill="#4338ca">400,100</text>
+  <text x="406" y="218" font-family="monospace" font-size="12" fill="#4338ca">400,200</text>
+  <text x="406" y="318" font-family="monospace" font-size="12" fill="#4338ca">400,300</text>
+  <text x="406" y="418" font-family="monospace" font-size="12" fill="#4338ca">400,400</text>
+  <text x="406" y="518" font-family="monospace" font-size="12" fill="#4338ca">400,500</text>
+  <text x="406" y="618" font-family="monospace" font-size="12" fill="#4338ca">400,600</text>
+  <text x="406" y="718" font-family="monospace" font-size="12" fill="#4338ca">400,700</text>
+  <text x="406" y="818" font-family="monospace" font-size="12" fill="#4338ca">400,800</text>
+  <text x="406" y="918" font-family="monospace" font-size="12" fill="#4338ca">400,900</text>
+  <text x="406" y="1018" font-family="monospace" font-size="12" fill="#4338ca">400,1000</text>
+  <text x="406" y="1118" font-family="monospace" font-size="12" fill="#4338ca">400,1100</text>
+  <text x="506" y="18" font-family="monospace" font-size="12" fill="#4338ca">500,0</text>
+  <text x="506" y="118" font-family="monospace" font-size="12" fill="#4338ca">500,100</text>
+  <text x="506" y="218" font-family="monospace" font-size="12" fill="#4338ca">500,200</text>
+  <text x="506" y="318" font-family="monospace" font-size="12" fill="#4338ca">500,300</text>
+  <text x="506" y="418" font-family="monospace" font-size="12" fill="#4338ca">500,400</text>
+  <text x="506" y="518" font-family="monospace" font-size="12" fill="#4338ca">500,500</text>
+  <text x="506" y="618" font-family="monospace" font-size="12" fill="#4338ca">500,600</text>
+  <text x="506" y="718" font-family="monospace" font-size="12" fill="#4338ca">500,700</text>
+  <text x="506" y="818" font-family="monospace" font-size="12" fill="#4338ca">500,800</text>
+  <text x="506" y="918" font-family="monospace" font-size="12" fill="#4338ca">500,900</text>
+  <text x="506" y="1018" font-family="monospace" font-size="12" fill="#4338ca">500,1000</text>
+  <text x="506" y="1118" font-family="monospace" font-size="12" fill="#4338ca">500,1100</text>
+  <text x="606" y="18" font-family="monospace" font-size="12" fill="#4338ca">600,0</text>
+  <text x="606" y="118" font-family="monospace" font-size="12" fill="#4338ca">600,100</text>
+  <text x="606" y="218" font-family="monospace" font-size="12" fill="#4338ca">600,200</text>
+  <text x="606" y="318" font-family="monospace" font-size="12" fill="#4338ca">600,300</text>
+  <text x="606" y="418" font-family="monospace" font-size="12" fill="#4338ca">600,400</text>
+  <text x="606" y="518" font-family="monospace" font-size="12" fill="#4338ca">600,500</text>
+  <text x="606" y="618" font-family="monospace" font-size="12" fill="#4338ca">600,600</text>
+  <text x="606" y="718" font-family="monospace" font-size="12" fill="#4338ca">600,700</text>
+  <text x="606" y="818" font-family="monospace" font-size="12" fill="#4338ca">600,800</text>
+  <text x="606" y="918" font-family="monospace" font-size="12" fill="#4338ca">600,900</text>
+  <text x="606" y="1018" font-family="monospace" font-size="12" fill="#4338ca">600,1000</text>
+  <text x="606" y="1118" font-family="monospace" font-size="12" fill="#4338ca">600,1100</text>
+  <text x="706" y="18" font-family="monospace" font-size="12" fill="#4338ca">700,0</text>
+  <text x="706" y="118" font-family="monospace" font-size="12" fill="#4338ca">700,100</text>
+  <text x="706" y="218" font-family="monospace" font-size="12" fill="#4338ca">700,200</text>
+  <text x="706" y="318" font-family="monospace" font-size="12" fill="#4338ca">700,300</text>
+  <text x="706" y="418" font-family="monospace" font-size="12" fill="#4338ca">700,400</text>
+  <text x="706" y="518" font-family="monospace" font-size="12" fill="#4338ca">700,500</text>
+  <text x="706" y="618" font-family="monospace" font-size="12" fill="#4338ca">700,600</text>
+  <text x="706" y="718" font-family="monospace" font-size="12" fill="#4338ca">700,700</text>
+  <text x="706" y="818" font-family="monospace" font-size="12" fill="#4338ca">700,800</text>
+  <text x="706" y="918" font-family="monospace" font-size="12" fill="#4338ca">700,900</text>
+  <text x="706" y="1018" font-family="monospace" font-size="12" fill="#4338ca">700,1000</text>
+  <text x="706" y="1118" font-family="monospace" font-size="12" fill="#4338ca">700,1100</text>
+  <rect x="0" y="0" width="800" height="60" fill="#111827"/>
+  <text x="16" y="38" font-family="sans-serif" font-size="28" fill="#ffffff">800x1200</text>
+</svg>
