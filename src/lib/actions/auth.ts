@@ -3,42 +3,111 @@
 import { redirect } from "next/navigation";
 
 import { env } from "@/lib/env";
+import {
+  fieldErrorsFrom,
+  friendlyAuthError,
+  safeNext,
+  submittedEmail,
+  type AuthFormState,
+} from "@/lib/auth/form-state";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { emailSchema } from "@/lib/validations/auth";
+import { signInSchema, signUpSchema } from "@/lib/validations/auth";
 
-export type SendMagicLinkState = {
-  status: "idle" | "success" | "error";
-  message?: string;
-};
-
-export async function sendMagicLink(
-  _prevState: SendMagicLinkState,
+export async function signInWithPassword(
+  _prevState: AuthFormState,
   formData: FormData
-): Promise<SendMagicLinkState> {
-  const parsed = emailSchema.safeParse({ email: formData.get("email") });
-  if (!parsed.success) {
-    return { status: "error", message: parsed.error.issues[0]?.message ?? "Invalid email" };
-  }
+): Promise<AuthFormState> {
+  const email = submittedEmail(formData.get("email"));
 
-  const next = formData.get("next");
-  const confirmUrl = new URL(`${env.NEXT_PUBLIC_SITE_URL}/auth/confirm`);
-  if (typeof next === "string" && next) {
-    confirmUrl.searchParams.set("next", next);
+  const parsed = signInSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+
+  if (!parsed.success) {
+    return { status: "error", email, fieldErrors: fieldErrorsFrom(parsed.error) };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithOtp({
+  const { error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
-    options: {
-      emailRedirectTo: confirmUrl.toString(),
-    },
+    password: parsed.data.password,
   });
 
   if (error) {
-    return { status: "error", message: error.message };
+    return { status: "error", email, message: friendlyAuthError(error) };
   }
 
-  return { status: "success", message: `Check ${parsed.data.email} for a sign-in link.` };
+  // Outside any try/catch: redirect() signals by throwing.
+  redirect(safeNext(formData.get("next")));
+}
+
+export async function signUpWithPassword(
+  _prevState: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const rawEmail = submittedEmail(formData.get("email"));
+
+  const parsed = signUpSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+
+  if (!parsed.success) {
+    return { status: "error", email: rawEmail, fieldErrors: fieldErrorsFrom(parsed.error) };
+  }
+
+  const { email, password } = parsed.data;
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.auth.signUp({ email, password });
+
+  if (error) {
+    return { status: "error", email, message: friendlyAuthError(error) };
+  }
+
+  // Supabase hides "email already registered" to prevent account enumeration:
+  // it returns a decoy user with an empty identities array rather than an
+  // error. That's the only signal that the address is taken.
+  if (data.user && data.user.identities?.length === 0) {
+    return {
+      status: "error",
+      email,
+      message: "An account with that email already exists. Sign in instead.",
+      fieldErrors: { email: "Already registered" },
+    };
+  }
+
+  if (!data.user) {
+    return { status: "error", email, message: "Could not create your account. Try again." };
+  }
+
+  // With "Confirm email" enabled on the project, signUp() returns no session
+  // and Supabase emails a link instead. This deployment has no working
+  // outbound email, so mark the address confirmed with the service-role key
+  // and open the session using the password we just set.
+  //
+  // Trade-off: signup no longer proves the user owns the address. Acceptable
+  // for an internal QA tool; revisit before opening signup to the public.
+  if (!data.session) {
+    const admin = createAdminClient();
+    const { error: confirmError } = await admin.auth.admin.updateUserById(data.user.id, {
+      email_confirm: true,
+    });
+
+    if (confirmError) {
+      return { status: "error", email, message: confirmError.message };
+    }
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) {
+      return { status: "error", email, message: friendlyAuthError(signInError) };
+    }
+  }
+
+  redirect(safeNext(formData.get("next")));
 }
 
 export async function signInWithGoogle(formData: FormData) {
