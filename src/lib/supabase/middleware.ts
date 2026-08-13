@@ -7,10 +7,14 @@ import { env } from "@/lib/env";
 // browser; it authorizes itself via an HMAC-signed query token instead of a
 // session cookie (see src/lib/exports/sign.ts), so it must bypass the
 // session check here.
-const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/print", "/invite", "/share"];
+//
+// /reset-password is deliberately NOT public: verifying the recovery token
+// opens a session first, so requiring one here is what stops the form being
+// reachable without a valid link.
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/auth", "/print", "/invite", "/share"];
 
 // Routes a signed-in user has no reason to see; they get bounced to the app.
-const SIGNED_OUT_ONLY_PATHS = ["/login", "/signup"];
+const SIGNED_OUT_ONLY_PATHS = ["/login", "/signup", "/forgot-password"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));

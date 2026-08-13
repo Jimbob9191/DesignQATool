@@ -10,9 +10,15 @@ import {
   submittedEmail,
   type AuthFormState,
 } from "@/lib/auth/form-state";
+import { sendEmail } from "@/lib/email/resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { signInSchema, signUpSchema } from "@/lib/validations/auth";
+import {
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  signInSchema,
+  signUpSchema,
+} from "@/lib/validations/auth";
 
 export async function signInWithPassword(
   _prevState: AuthFormState,
@@ -108,6 +114,111 @@ export async function signUpWithPassword(
   }
 
   redirect(safeNext(formData.get("next")));
+}
+
+/** Where the recovery link drops the user once the token has been verified. */
+const RESET_PASSWORD_PATH = "/reset-password";
+
+/**
+ * Mints a recovery link and delivers it with Resend rather than calling
+ * supabase.auth.resetPasswordForEmail(), which would hand delivery to
+ * Supabase's built-in SMTP — the same outbound email that doesn't work on this
+ * project (see signUpWithPassword). Resend is already the app's working mail
+ * path for invites, so recovery rides on it too.
+ *
+ * Returns nothing on purpose: every outcome, including "no such account",
+ * looks identical to the caller.
+ */
+async function deliverPasswordResetEmail(email: string): Promise<void> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.generateLink({ type: "recovery", email });
+
+  if (error || !data.properties?.hashed_token) {
+    // Almost always "user not found". Logged for operators, never surfaced:
+    // a visible difference here would make this form an account-enumeration
+    // oracle for anyone who can type an address into it.
+    console.warn("[auth] no recovery link generated:", error?.message ?? "token missing");
+    return;
+  }
+
+  // Build our own /auth/confirm URL instead of using data.properties.action_link.
+  // action_link returns tokens in the URL fragment, which only client-side JS
+  // can read; the token_hash flow verifies server-side in the route handler.
+  const confirmUrl = new URL(`${env.NEXT_PUBLIC_SITE_URL}/auth/confirm`);
+  confirmUrl.searchParams.set("token_hash", data.properties.hashed_token);
+  confirmUrl.searchParams.set("type", "recovery");
+  confirmUrl.searchParams.set("next", RESET_PASSWORD_PATH);
+
+  const sent = await sendEmail({
+    to: email,
+    subject: "Reset your Design QA Tool password",
+    html: `
+      <p>We got a request to reset the password for this Design QA Tool account.</p>
+      <p><a href="${confirmUrl.toString()}">Choose a new password</a></p>
+      <p>The link can only be used once and expires in about an hour. If you didn't ask for this, you can ignore this email — your password won't change.</p>
+    `,
+  });
+
+  if (!sent.sent) {
+    console.error("[auth] password reset email failed to send:", sent.error);
+  }
+}
+
+export async function requestPasswordReset(
+  _prevState: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const email = submittedEmail(formData.get("email"));
+
+  const parsed = forgotPasswordSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) {
+    return { status: "error", email, fieldErrors: fieldErrorsFrom(parsed.error) };
+  }
+
+  await deliverPasswordResetEmail(parsed.data.email);
+
+  // Unconditionally the same answer whether or not the account exists.
+  return {
+    status: "success",
+    email: parsed.data.email,
+    message: `If an account exists for ${parsed.data.email}, a reset link is on its way. It expires in about an hour.`,
+  };
+}
+
+export async function updatePassword(
+  _prevState: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const parsed = resetPasswordSchema.safeParse({
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+
+  if (!parsed.success) {
+    return { status: "error", fieldErrors: fieldErrorsFrom(parsed.error) };
+  }
+
+  const supabase = await createClient();
+
+  // Verifying the recovery token signed the user in. No session means the link
+  // expired or was already used, and updateUser() would fail with a message
+  // that doesn't explain what to do next.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return {
+      status: "error",
+      message: "That reset link has expired or was already used. Request a new one.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+  if (error) {
+    return { status: "error", message: friendlyAuthError(error) };
+  }
+
+  redirect("/dashboard");
 }
 
 export async function signInWithGoogle(formData: FormData) {

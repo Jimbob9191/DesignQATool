@@ -9,7 +9,13 @@ import type { ZodError } from "zod";
 export type AuthField = "email" | "password" | "confirmPassword";
 
 export type AuthFormState = {
-  status: "idle" | "error";
+  /**
+   * "success" is only used by forms that finish without navigating away —
+   * currently just the reset request, which deliberately stays put and shows
+   * a confirmation rather than redirecting. Actions that end in redirect()
+   * never return at all, so they only ever produce "idle" or "error".
+   */
+  status: "idle" | "error" | "success";
   message?: string;
   fieldErrors?: Partial<Record<AuthField, string>>;
   /**
