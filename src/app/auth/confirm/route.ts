@@ -2,13 +2,16 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
 
+import { safeNext } from "@/lib/auth/form-state";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/dashboard";
+  // safeNext, not the raw param: this URL is emailed around, and redirect()
+  // would happily follow an absolute "next" straight off-site.
+  const next = safeNext(searchParams.get("next"));
 
   if (tokenHash && type) {
     const supabase = await createClient();

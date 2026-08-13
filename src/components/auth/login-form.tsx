@@ -15,6 +15,9 @@ export function LoginForm({ next }: { next?: string }) {
   const [state, formAction, isPending] = useActionState(signInWithPassword, initialAuthState);
 
   const signupHref = next ? `/signup?next=${encodeURIComponent(next)}` : "/signup";
+  const forgotHref = next
+    ? `/forgot-password?next=${encodeURIComponent(next)}`
+    : "/forgot-password";
 
   return (
     <div className="flex flex-col gap-6">
@@ -42,7 +45,15 @@ export function LoginForm({ next }: { next?: string }) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="password">Password</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="password">Password</Label>
+            <Link
+              href={forgotHref}
+              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <Input
             id="password"
             name="password"

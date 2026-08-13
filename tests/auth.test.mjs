@@ -8,7 +8,13 @@ import {
   safeNext,
   submittedEmail,
 } from "../src/lib/auth/form-state.ts";
-import { signInSchema, signUpSchema, PASSWORD_MIN_LENGTH } from "../src/lib/validations/auth.ts";
+import {
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  signInSchema,
+  signUpSchema,
+  PASSWORD_MIN_LENGTH,
+} from "../src/lib/validations/auth.ts";
 
 test("initialAuthState starts idle with no messages", () => {
   assert.deepEqual(initialAuthState, { status: "idle" });
@@ -98,6 +104,43 @@ test("signUpSchema enforces the minimum password length", () => {
 test("signUpSchema rejects mismatched passwords on the confirm field", () => {
   const result = signUpSchema.safeParse({
     email: "new@example.com",
+    password: "correct-horse",
+    confirmPassword: "correct-horsf",
+  });
+  assert.equal(result.success, false);
+  assert.equal(fieldErrorsFrom(result.error).confirmPassword, "Passwords do not match");
+});
+
+test("forgotPasswordSchema accepts and trims an email, and asks for nothing else", () => {
+  const result = forgotPasswordSchema.safeParse({ email: "  user@example.com " });
+  assert.equal(result.success, true);
+  assert.equal(result.data.email, "user@example.com");
+  assert.deepEqual(Object.keys(result.data), ["email"]);
+});
+
+test("forgotPasswordSchema rejects a malformed email", () => {
+  const result = forgotPasswordSchema.safeParse({ email: "nope" });
+  assert.equal(result.success, false);
+  assert.equal(fieldErrorsFrom(result.error).email, "Enter a valid email address");
+});
+
+test("resetPasswordSchema accepts a valid matching pair with no email field", () => {
+  const result = resetPasswordSchema.safeParse({
+    password: "correct-horse",
+    confirmPassword: "correct-horse",
+  });
+  assert.equal(result.success, true);
+});
+
+test("resetPasswordSchema enforces the same minimum length as signup", () => {
+  const short = "a".repeat(PASSWORD_MIN_LENGTH - 1);
+  const result = resetPasswordSchema.safeParse({ password: short, confirmPassword: short });
+  assert.equal(result.success, false);
+  assert.match(fieldErrorsFrom(result.error).password, /at least 8 characters/);
+});
+
+test("resetPasswordSchema rejects mismatched passwords on the confirm field", () => {
+  const result = resetPasswordSchema.safeParse({
     password: "correct-horse",
     confirmPassword: "correct-horsf",
   });
