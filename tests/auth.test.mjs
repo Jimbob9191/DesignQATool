@@ -37,6 +37,7 @@ test("safeNext rejects off-site redirects", () => {
   assert.equal(safeNext("https://evil.com"), "/dashboard");
   assert.equal(safeNext("http://evil.com/path"), "/dashboard");
   assert.equal(safeNext("javascript:alert(1)"), "/dashboard");
+  assert.equal(safeNext("/\\evil.com"), "/dashboard", "backslash is normalised to // by browsers");
 });
 
 test("friendlyAuthError rewrites developer-facing Supabase messages", () => {

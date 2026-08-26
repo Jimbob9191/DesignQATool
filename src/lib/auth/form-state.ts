@@ -76,8 +76,14 @@ export function submittedEmail(value: unknown): string {
 }
 
 export function safeNext(value: unknown): string {
-  if (typeof value === "string" && value.startsWith("/") && !value.startsWith("//")) {
-    return value;
+  if (typeof value !== "string" || !value.startsWith("/")) {
+    return "/dashboard";
   }
-  return "/dashboard";
+  // "//evil.com" is protocol-relative. Browsers also normalise the backslash in
+  // "/\evil.com" to "//evil.com", so that prefix leaves the origin as well.
+  const separator = value[1];
+  if (separator === "/" || separator === "\\") {
+    return "/dashboard";
+  }
+  return value;
 }
