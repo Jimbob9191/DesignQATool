@@ -120,6 +120,27 @@
       "when": 1785426636076,
       "tag": "0016_broad_king_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1787764104794,
+      "tag": "0017_sleepy_iron_monger",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787764616842,
+      "tag": "0018_mature_vanisher",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787764669173,
+      "tag": "0019_unfile_assets_on_project_delete",
+      "breakpoints": true
     }
   ]
 }

@@ -1,10 +1,8 @@
-import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { authUsers } from "drizzle-orm/supabase";
-import { ArrowLeft } from "lucide-react";
 
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import type { ElementMapEntry } from "@/lib/annotations/hit-test";
@@ -22,6 +20,8 @@ import {
   teamMembers,
 } from "@/lib/db/schema";
 import { env } from "@/lib/env";
+import { buildProjectCrumbs } from "@/lib/navigation/crumbs";
+import { PageBreadcrumb } from "@/components/app-shell/page-breadcrumb";
 import { Button } from "@/components/ui/button";
 import { ComparisonWorkspace } from "@/components/comparison/comparison-workspace";
 import { DeleteComparisonButton } from "@/components/comparisons/delete-comparison-button";
@@ -47,6 +47,7 @@ export default async function ComparisonDetailPage({
     .select({
       comparison: comparisons,
       page: pages,
+      project: projects,
       design: designAssets,
       capture: captureAssets,
     })
@@ -161,18 +162,18 @@ export default async function ComparisonDetailPage({
 
   return (
     <div className="flex flex-col gap-4">
+      <PageBreadcrumb
+        items={buildProjectCrumbs({
+          projectName: row.project.name,
+          projectSlug: row.project.slug,
+          pageName: row.page.name,
+          pageId,
+          comparisonName: row.comparison.name,
+        })}
+      />
+
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href={`/projects/${projectSlug}/${pageId}`}>
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">{row.comparison.name}</h1>
-            <p className="text-sm text-muted-foreground">{row.page.name}</p>
-          </div>
-        </div>
+        <h1 className="text-xl font-semibold tracking-tight">{row.comparison.name}</h1>
         <div className="flex items-center gap-2">
           {canEdit && hasNewerCapture ? (
             <RefreshCaptureButton comparisonId={comparisonId} newCaptureAssetId={latestCapture.assetId} />

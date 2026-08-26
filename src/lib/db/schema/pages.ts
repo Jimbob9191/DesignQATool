@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgPolicy, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { authenticatedRole } from "drizzle-orm/supabase";
 
 import { projects } from "./projects";
@@ -17,6 +17,10 @@ export const pages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    // Target for the composite foreign key on assets(page_id, project_id) —
+    // see assets.ts. Postgres requires a unique constraint on the referenced
+    // columns, and pages.id alone is not enough for a two-column reference.
+    unique("pages_id_project_id_unique").on(table.id, table.projectId),
     pgPolicy("pages_select_team_member", {
       for: "select",
       to: authenticatedRole,

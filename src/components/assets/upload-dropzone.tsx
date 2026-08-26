@@ -17,7 +17,13 @@ type UploadState = {
   error?: string;
 };
 
-export function UploadDropzone({ defaultPageId = null }: { defaultPageId?: string | null }) {
+export function UploadDropzone({
+  defaultPageId = null,
+  defaultProjectId = null,
+}: {
+  defaultPageId?: string | null;
+  defaultProjectId?: string | null;
+}) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -47,6 +53,7 @@ export function UploadDropzone({ defaultPageId = null }: { defaultPageId?: strin
 
       const urlResult = await requestUploadUrl({
         pageId: defaultPageId,
+        projectId: defaultProjectId,
         filename: file.name,
         mime: file.type,
         size: file.size,
@@ -69,6 +76,7 @@ export function UploadDropzone({ defaultPageId = null }: { defaultPageId?: strin
 
       const dimensions = await readImageDimensions(file);
       const confirmResult = await confirmUpload({
+        projectId: defaultProjectId,
         assetId,
         storagePath,
         pageId: defaultPageId,
@@ -86,7 +94,7 @@ export function UploadDropzone({ defaultPageId = null }: { defaultPageId?: strin
       toast.success(`${file.name} uploaded`);
       router.refresh();
     },
-    [defaultPageId, router]
+    [defaultPageId, defaultProjectId, router]
   );
 
   const handleFiles = useCallback(

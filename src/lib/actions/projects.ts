@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 
 import { requireTeamRole } from "@/lib/auth/team";
 import { db } from "@/lib/db";
-import { projects } from "@/lib/db/schema";
+import { assets, projects } from "@/lib/db/schema";
 import { projectFormSchema } from "@/lib/validations/project";
 
 type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
@@ -84,6 +84,16 @@ export async function updateProject(
 
 export async function deleteProject(projectId: string): Promise<void> {
   const { team } = await requireTeamRole("admin");
+
+  // Unfile the project's assets first. Deleting the project would also clear
+  // these columns via ON DELETE SET NULL / the cascade through pages, but the
+  // order those two fire in isn't something to depend on — doing it here
+  // guarantees the pair is cleared together and the assets land back in the
+  // team library rather than half-scoped.
+  await db
+    .update(assets)
+    .set({ pageId: null, projectId: null })
+    .where(and(eq(assets.projectId, projectId), eq(assets.teamId, team.id)));
 
   await db.delete(projects).where(and(eq(projects.id, projectId), eq(projects.teamId, team.id)));
 

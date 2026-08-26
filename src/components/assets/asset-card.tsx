@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { deleteAsset, setAssetPage } from "@/lib/actions/assets";
+import { deleteAsset, setAssetPage, setAssetProject } from "@/lib/actions/assets";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,18 +24,25 @@ export type AssetCardData = {
   width: number | null;
   height: number | null;
   pageId: string | null;
+  projectId: string | null;
   signedUrl: string | null;
 };
 
 export type PageOption = { id: string; label: string };
+export type ProjectOption = { id: string; label: string };
 
 export function AssetCard({
   asset,
   pageOptions,
+  projectOptions,
   canEdit = true,
 }: {
   asset: AssetCardData;
   pageOptions: PageOption[];
+  // Only supplied where the wider scope is meaningful (the team-wide asset
+  // library). On a page's own grid there is nothing to choose between, so the
+  // project select is left off entirely.
+  projectOptions?: ProjectOption[];
   canEdit?: boolean;
 }) {
   const router = useRouter();
@@ -43,6 +50,18 @@ export function AssetCard({
 
   async function handlePageChange(value: string) {
     const result = await setAssetPage(asset.id, value === "unassigned" ? null : value);
+    if (!result.success) {
+      toast.error(result.error);
+      return;
+    }
+    router.refresh();
+  }
+
+  // Picking a project deliberately drops any page assignment (setAssetProject
+  // clears it), which is why the two selects can never end up describing
+  // different projects.
+  async function handleProjectChange(value: string) {
+    const result = await setAssetProject(asset.id, value === "unassigned" ? null : value);
     if (!result.success) {
       toast.error(result.error);
       return;
@@ -80,23 +99,49 @@ export function AssetCard({
           </p>
         ) : null}
 
-        <Select
-          value={asset.pageId ?? "unassigned"}
-          onValueChange={handlePageChange}
-          disabled={!canEdit}
-        >
-          <SelectTrigger size="sm" className="w-full">
-            <SelectValue placeholder="Unassigned" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="unassigned">Unassigned</SelectItem>
-            {pageOptions.map((page) => (
-              <SelectItem key={page.id} value={page.id}>
-                {page.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {projectOptions ? (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Project</span>
+            <Select
+              value={asset.projectId ?? "unassigned"}
+              onValueChange={handleProjectChange}
+              disabled={!canEdit}
+            >
+              <SelectTrigger size="sm" className="w-full">
+                <SelectValue placeholder="Unassigned" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {projectOptions.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
+        <div className="flex flex-col gap-1">
+          {projectOptions ? <span className="text-xs text-muted-foreground">Page</span> : null}
+          <Select
+            value={asset.pageId ?? "unassigned"}
+            onValueChange={handlePageChange}
+            disabled={!canEdit}
+          >
+            <SelectTrigger size="sm" className="w-full">
+              <SelectValue placeholder="Unassigned" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
+              {pageOptions.map((page) => (
+                <SelectItem key={page.id} value={page.id}>
+                  {page.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         {canEdit ? (
           <ConfirmDeleteDialog

@@ -1,16 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { AlertCircle, Clock, GitCompare, ImageOff } from "lucide-react";
 
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import { getCurrentTeam } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { assets, captures, comparisons, pages, projects } from "@/lib/db/schema";
+import { buildProjectCrumbs } from "@/lib/navigation/crumbs";
+import { PageBreadcrumb } from "@/components/app-shell/page-breadcrumb";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AssetCard } from "@/components/assets/asset-card";
+import { UploadDropzone } from "@/components/assets/upload-dropzone";
 import { CapturePanel } from "@/components/captures/capture-panel";
 import { CreateComparisonDialog } from "@/components/comparisons/create-comparison-dialog";
 
@@ -41,15 +44,29 @@ export default async function PageDetailPage({
     .where(eq(assets.pageId, pageId))
     .orderBy(desc(captures.createdAt));
 
+  // Designs this page can be compared against: the ones already filed here,
+  // plus the project's unfiled library, which createComparison will file onto
+  // the page on first use.
   const designAssets = await db
     .select()
     .from(assets)
-    .where(and(eq(assets.pageId, pageId), eq(assets.kind, "design")))
+    .where(
+      and(
+        eq(assets.teamId, team.id),
+        eq(assets.kind, "design"),
+        or(
+          eq(assets.pageId, pageId),
+          and(isNull(assets.pageId), eq(assets.projectId, row.page.projectId))
+        )
+      )
+    )
     .orderBy(desc(assets.createdAt));
+
+  const pageDesignAssets = designAssets.filter((a) => a.pageId === pageId);
 
   const signedUrls = await getAssetSignedUrls([
     ...pageCaptures.filter((c) => c.capture.status === "ready").map((c) => c.asset.storagePath),
-    ...designAssets.map((a) => a.storagePath),
+    ...pageDesignAssets.map((a) => a.storagePath),
   ]);
 
   const hasPendingCapture = pageCaptures.some((c) => c.capture.status === "pending");
@@ -70,10 +87,12 @@ export default async function PageDetailPage({
   );
 
   const readyCaptures = pageCaptures.filter((c) => c.capture.status === "ready");
-  const designOptions = designAssets.map((a) => ({
-    id: a.id,
-    label: a.storagePath.split("/").pop() ?? a.id,
-  }));
+  const designOptions = designAssets.map((a) => {
+    const filename = a.storagePath.split("/").pop() ?? a.id;
+    // Say where a design comes from, since picking a library one moves it
+    // onto this page.
+    return { id: a.id, label: a.pageId ? filename : `${filename} — project library` };
+  });
   const captureOptions = readyCaptures.map(({ capture, asset }) => ({
     id: asset.id,
     label: `${capture.viewportWidth}px — ${(capture.capturedAt ?? capture.createdAt).toLocaleString()}`,
@@ -81,6 +100,15 @@ export default async function PageDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <PageBreadcrumb
+        items={buildProjectCrumbs({
+          projectName: row.project.name,
+          projectSlug: row.project.slug,
+          pageName: row.page.name,
+          pageId,
+        })}
+      />
+
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{row.page.name}</h1>
         <p className="font-mono text-sm text-muted-foreground">{row.page.path}</p>
@@ -233,27 +261,38 @@ export default async function PageDetailPage({
         )}
       </div>
 
-      {designAssets.length > 0 ? (
+      {canEdit || pageDesignAssets.length > 0 ? (
         <div>
           <h2 className="mb-3 text-lg font-medium">Design assets</h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {designAssets.map((asset) => (
-              <AssetCard
-                key={asset.id}
-                asset={{
-                  id: asset.id,
-                  kind: asset.kind,
-                  storagePath: asset.storagePath,
-                  width: asset.width,
-                  height: asset.height,
-                  pageId: asset.pageId,
-                  signedUrl: signedUrls.get(asset.storagePath) ?? null,
-                }}
-                pageOptions={[{ id: pageId, label: row.page.name }]}
-                canEdit={canEdit}
-              />
-            ))}
-          </div>
+          {/* Uploading from the page is the only route that files an asset
+              straight onto it — the team-wide dropzone has no page to default
+              to, so anything dropped there starts out unassigned. */}
+          {canEdit ? (
+            <div className="mb-4">
+              <UploadDropzone defaultPageId={pageId} defaultProjectId={row.page.projectId} />
+            </div>
+          ) : null}
+          {pageDesignAssets.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {pageDesignAssets.map((asset) => (
+                <AssetCard
+                  key={asset.id}
+                  asset={{
+                    id: asset.id,
+                    kind: asset.kind,
+                    storagePath: asset.storagePath,
+                    width: asset.width,
+                    height: asset.height,
+                    pageId: asset.pageId,
+                    projectId: asset.projectId,
+                    signedUrl: signedUrls.get(asset.storagePath) ?? null,
+                  }}
+                  pageOptions={[{ id: pageId, label: row.page.name }]}
+                  canEdit={canEdit}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

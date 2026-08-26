@@ -13,26 +13,45 @@ import { ImageOff } from "lucide-react";
 export default async function AssetsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; kind?: string }>;
+  searchParams: Promise<{ page?: string; kind?: string; project?: string }>;
 }) {
-  const { page: pageFilter, kind: kindFilter } = await searchParams;
+  const { page: pageFilter, kind: kindFilter, project: projectFilter } = await searchParams;
   const { team, role } = await getCurrentTeam();
   const canEdit = role !== "viewer";
 
-  const teamPages = await db
-    .select({ id: pages.id, name: pages.name, projectName: projects.name })
-    .from(pages)
-    .innerJoin(projects, eq(pages.projectId, projects.id))
+  // Left join, not inner: a project with no pages yet still has to appear in
+  // the project options, otherwise an asset filed against it would render a
+  // blank project select.
+  const teamPageRows = await db
+    .select({
+      pageId: pages.id,
+      pageName: pages.name,
+      projectId: projects.id,
+      projectName: projects.name,
+    })
+    .from(projects)
+    .leftJoin(pages, eq(pages.projectId, projects.id))
     .where(eq(projects.teamId, team.id))
     .orderBy(projects.name, pages.name);
 
-  const pageOptions = teamPages.map((p) => ({ id: p.id, label: `${p.projectName} / ${p.name}` }));
+  const pageOptions = teamPageRows
+    .filter((row) => row.pageId !== null && row.pageName !== null)
+    .map((row) => ({ id: row.pageId!, label: `${row.projectName} / ${row.pageName}` }));
+
+  const projectOptions = [
+    ...new Map(teamPageRows.map((row) => [row.projectId, row.projectName])).entries(),
+  ].map(([id, label]) => ({ id, label }));
 
   const conditions = [eq(assets.teamId, team.id)];
   if (pageFilter === "unassigned") {
     conditions.push(isNull(assets.pageId));
   } else if (pageFilter) {
     conditions.push(eq(assets.pageId, pageFilter));
+  }
+  if (projectFilter === "unassigned") {
+    conditions.push(isNull(assets.projectId));
+  } else if (projectFilter) {
+    conditions.push(eq(assets.projectId, projectFilter));
   }
   if (kindFilter === "design" || kindFilter === "capture") {
     conditions.push(eq(assets.kind, kindFilter));
@@ -55,7 +74,7 @@ export default async function AssetsPage({
 
       {canEdit ? <UploadDropzone /> : null}
 
-      <AssetFilters pageOptions={pageOptions} />
+      <AssetFilters pageOptions={pageOptions} projectOptions={projectOptions} />
 
       {teamAssets.length === 0 ? (
         <Card>
@@ -81,9 +100,11 @@ export default async function AssetsPage({
                 width: asset.width,
                 height: asset.height,
                 pageId: asset.pageId,
+                projectId: asset.projectId,
                 signedUrl: signedUrls.get(asset.storagePath) ?? null,
               }}
               pageOptions={pageOptions}
+              projectOptions={projectOptions}
               canEdit={canEdit}
             />
           ))}

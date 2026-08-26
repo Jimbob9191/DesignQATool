@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { getCurrentUser, requireTeamRole } from "@/lib/auth/team";
+import { checkComparisonAssets } from "@/lib/comparisons/eligibility";
 import { db } from "@/lib/db";
-import { assets, comparisons, pages, projects } from "@/lib/db/schema";
+import { assets, comparisons } from "@/lib/db/schema";
+import { findPageInTeam } from "@/lib/db/scope";
 
 type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
 
@@ -16,6 +18,10 @@ const createComparisonSchema = z.object({
   captureAssetId: z.uuid(),
   name: z.string().trim().min(1, "Name is required").max(100),
 });
+
+// Thrown inside the transaction below purely to roll it back; it never
+// escapes createComparison.
+class ConcurrentAssignmentError extends Error {}
 
 export async function createComparison(
   input: unknown
@@ -31,57 +37,104 @@ export async function createComparison(
     return { success: false, error: "Not signed in." };
   }
 
-  const [page] = await db
-    .select({ id: pages.id, projectSlug: projects.slug })
-    .from(pages)
-    .innerJoin(projects, eq(pages.projectId, projects.id))
-    .where(and(eq(pages.id, parsed.data.pageId), eq(projects.teamId, team.id)))
-    .limit(1);
-  if (!page) {
+  const scope = await findPageInTeam(parsed.data.pageId, team.id);
+  if (!scope) {
     return { success: false, error: "Page not found." };
   }
 
-  const usedAssets = await db
-    .select({ id: assets.id })
+  // Fetch exactly the two rows the caller named rather than everything filed
+  // on the page: a design may legitimately still be sitting in the project
+  // library, and checkComparisonAssets is what decides.
+  const candidates = await db
+    .select({ id: assets.id, kind: assets.kind, pageId: assets.pageId, projectId: assets.projectId })
     .from(assets)
     .where(
       and(
         eq(assets.teamId, team.id),
-        eq(assets.pageId, parsed.data.pageId)
+        inArray(assets.id, [parsed.data.designAssetId, parsed.data.captureAssetId])
       )
     );
-  const validAssetIds = new Set(usedAssets.map((a) => a.id));
-  if (
-    !validAssetIds.has(parsed.data.designAssetId) ||
-    !validAssetIds.has(parsed.data.captureAssetId)
-  ) {
-    return { success: false, error: "Selected assets do not belong to this page." };
+
+  const eligibility = checkComparisonAssets({
+    pageId: scope.pageId,
+    projectId: scope.projectId,
+    designAssetId: parsed.data.designAssetId,
+    captureAssetId: parsed.data.captureAssetId,
+    candidates,
+  });
+  if (!eligibility.ok) {
+    return { success: false, error: eligibility.error };
   }
 
-  const [comparison] = await db
-    .insert(comparisons)
-    .values({
-      pageId: parsed.data.pageId,
-      designAssetId: parsed.data.designAssetId,
-      captureAssetId: parsed.data.captureAssetId,
-      name: parsed.data.name,
-      createdBy: user.id,
-    })
-    .returning({ id: comparisons.id });
+  const values = {
+    pageId: parsed.data.pageId,
+    designAssetId: parsed.data.designAssetId,
+    captureAssetId: parsed.data.captureAssetId,
+    name: parsed.data.name,
+    createdBy: user.id,
+  };
 
-  revalidatePath(`/projects/${page.projectSlug}/${parsed.data.pageId}`);
+  let comparison: { id: string } | undefined;
+
+  if (eligibility.designNeedsPageAssignment) {
+    try {
+      comparison = await db.transaction(async (tx) => {
+        // Re-assert page_id IS NULL inside the transaction: between the read
+        // above and now, someone else may have filed this design onto another
+        // page. Matching zero rows means exactly that, and we would rather
+        // fail than leave a comparison pointing at an asset that has since
+        // moved elsewhere.
+        const [filed] = await tx
+          .update(assets)
+          .set({ pageId: scope.pageId, projectId: scope.projectId })
+          .where(
+            and(
+              eq(assets.id, parsed.data.designAssetId),
+              eq(assets.teamId, team.id),
+              isNull(assets.pageId),
+              eq(assets.projectId, scope.projectId)
+            )
+          )
+          .returning({ id: assets.id });
+
+        if (!filed) {
+          throw new ConcurrentAssignmentError();
+        }
+
+        const [created] = await tx.insert(comparisons).values(values).returning({
+          id: comparisons.id,
+        });
+        return created;
+      });
+    } catch (error) {
+      if (error instanceof ConcurrentAssignmentError) {
+        return {
+          success: false,
+          error: "That design was just assigned to another page. Reload and try again.",
+        };
+      }
+      throw error;
+    }
+  } else {
+    [comparison] = await db.insert(comparisons).values(values).returning({ id: comparisons.id });
+  }
+
+  if (!comparison) {
+    return { success: false, error: "Could not create the comparison." };
+  }
+
+  // The design may have moved out of the library and onto the page, so the
+  // asset list and the project overview are stale too, not just this page.
+  revalidatePath(`/projects/${scope.projectSlug}/${parsed.data.pageId}`);
+  revalidatePath(`/projects/${scope.projectSlug}`);
+  revalidatePath("/assets");
   return { success: true, data: comparison };
 }
 
 export async function deleteComparison(pageId: string, comparisonId: string): Promise<void> {
   const { team } = await requireTeamRole("member");
 
-  const [page] = await db
-    .select({ id: pages.id, projectSlug: projects.slug })
-    .from(pages)
-    .innerJoin(projects, eq(pages.projectId, projects.id))
-    .where(and(eq(pages.id, pageId), eq(projects.teamId, team.id)))
-    .limit(1);
+  const page = await findPageInTeam(pageId, team.id);
   if (!page) return;
 
   await db.delete(comparisons).where(and(eq(comparisons.id, comparisonId), eq(comparisons.pageId, pageId)));

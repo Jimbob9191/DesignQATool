@@ -2,13 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getCurrentUser, requireTeamRole } from "@/lib/auth/team";
 import { callCaptureService, PRESET_VIEWPORTS } from "@/lib/capture/client";
 import { db } from "@/lib/db";
-import { assets, captures, pages, projects } from "@/lib/db/schema";
+import { assets, captures } from "@/lib/db/schema";
+import { findPageInTeam } from "@/lib/db/scope";
 import { ASSETS_BUCKET, createAdminClient } from "@/lib/supabase/admin";
 
 type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
@@ -37,12 +38,7 @@ export async function startCapture(
     return { success: false, error: "Not signed in." };
   }
 
-  const [page] = await db
-    .select({ id: pages.id, projectSlug: projects.slug })
-    .from(pages)
-    .innerJoin(projects, eq(pages.projectId, projects.id))
-    .where(and(eq(pages.id, parsed.data.pageId), eq(projects.teamId, team.id)))
-    .limit(1);
+  const page = await findPageInTeam(parsed.data.pageId, team.id);
   if (!page) {
     return { success: false, error: "Page not found." };
   }
@@ -53,7 +49,11 @@ export async function startCapture(
   await db.insert(assets).values({
     id: assetId,
     teamId: team.id,
-    pageId: parsed.data.pageId,
+    pageId: page.pageId,
+    // A capture is only ever taken for a page, so its project is the page's
+    // own — the pair is filled in together here for the same reason
+    // setAssetScope is the sole writer of both columns elsewhere.
+    projectId: page.projectId,
     kind: "capture",
     storagePath,
     mime: "image/webp",

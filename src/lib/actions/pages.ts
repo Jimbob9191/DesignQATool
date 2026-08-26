@@ -5,18 +5,17 @@ import { and, eq } from "drizzle-orm";
 
 import { requireTeamRole } from "@/lib/auth/team";
 import { db } from "@/lib/db";
-import { pages, projects } from "@/lib/db/schema";
+import { pages } from "@/lib/db/schema";
+import { findProjectInTeam, type ProjectScope } from "@/lib/db/scope";
 import { pageFormSchema } from "@/lib/validations/page";
 
 type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
 
-async function assertProjectInTeam(projectId: string, teamId: string) {
-  const [project] = await db
-    .select({ id: projects.id, slug: projects.slug })
-    .from(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.teamId, teamId)))
-    .limit(1);
-
+// Throwing wrapper over the shared lookup: every caller below treats a
+// missing project as a bug rather than a user-facing error, so the throw
+// stays here instead of leaking a null into the action bodies.
+async function assertProjectInTeam(projectId: string, teamId: string): Promise<ProjectScope> {
+  const project = await findProjectInTeam(projectId, teamId);
   if (!project) {
     throw new Error("Project not found.");
   }
