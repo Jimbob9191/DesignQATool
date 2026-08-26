@@ -7,8 +7,16 @@ import { PRESET_VIEWPORTS, type ElementMapEntry, type PresetViewport } from "./c
 export type CaptureServiceResult = {
   image: string; // base64
   mime: string;
+  /**
+   * CSS pixels, not the encoded file's pixels — a page too tall for WebP's
+   * 16383px limit is downscaled before encoding, and imageScale records by how
+   * much. Element-map rects and annotation pins are in this CSS-pixel space,
+   * and the viewer renders the image into a box of exactly these dimensions,
+   * so they line up whether or not the file was shrunk.
+   */
   width: number;
   height: number;
+  imageScale: number;
   elementMap: ElementMapEntry[];
 };
 
