@@ -7,6 +7,7 @@ import {
   neutralizeFixedAndSticky,
   type ElementMapEntry,
 } from "./browser-scripts.js";
+import { fitWithinWebpLimits } from "./image-fit.js";
 
 export const PRESET_VIEWPORTS = [390, 768, 1440] as const;
 export type PresetViewport = (typeof PRESET_VIEWPORTS)[number];
@@ -23,8 +24,16 @@ export type CaptureRequest = {
 
 export type CaptureResult = {
   image: Buffer;
+  /** CSS pixels — the space element-map rects and annotation pins live in. */
   width: number;
   height: number;
+  /**
+   * Ratio of the encoded image's pixel size to the width/height above. 1 for an
+   * ordinary page; below 1 when a tall page had to be shrunk to fit WebP's
+   * 16383px limit. Reported for diagnostics only — consumers position against
+   * width/height, never against the file's intrinsic pixels.
+   */
+  imageScale: number;
   elementMap: ElementMapEntry[];
 };
 
@@ -118,12 +127,24 @@ async function captureInContext(
 
   const elementMap = await page.evaluate(buildElementMap);
   const pngBuffer = await page.screenshot({ type: "png" });
-  const image = await sharp(pngBuffer).webp({ quality: 82 }).toBuffer();
+
+  // The screenshot is CSS pixels times the device scale factor, and a long
+  // page overruns what WebP can encode. Shrink it to fit rather than failing
+  // the capture: the reported width/height stay in CSS pixels either way, so
+  // the element map and every pin drawn against it are unaffected.
+  const png = sharp(pngBuffer);
+  const metadata = await png.metadata();
+  const fitted = fitWithinWebpLimits({ width: metadata.width, height: metadata.height });
+  if (fitted.scale < 1) {
+    png.resize({ width: fitted.width, height: fitted.height, fit: "fill" });
+  }
+  const image = await png.webp({ quality: 82 }).toBuffer();
 
   return {
     image,
     width: request.viewportWidth,
     height: targetHeight,
+    imageScale: fitted.scale,
     elementMap,
   };
 }

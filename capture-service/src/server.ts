@@ -46,6 +46,7 @@ app.post("/capture", async (request, reply) => {
       mime: "image/webp",
       width: result.width,
       height: result.height,
+      imageScale: result.imageScale,
       elementMap: result.elementMap,
     });
   } catch (error) {
