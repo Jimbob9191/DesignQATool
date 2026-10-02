@@ -12,6 +12,7 @@ import { CURRENT_TEAM_COOKIE, getCurrentUser, requireTeamRole } from "@/lib/auth
 import { db } from "@/lib/db";
 import { invitations, teamMembers } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email/resend";
+import { invitationEmail } from "@/lib/email/templates";
 import { env } from "@/lib/env";
 
 type ActionResult<T> =
@@ -74,12 +75,12 @@ export async function inviteMember(input: unknown): Promise<ActionResult<{ id: s
   const acceptUrl = `${env.NEXT_PUBLIC_SITE_URL}/invite/accept?token=${token}`;
   const emailResult = await sendEmail({
     to: email,
-    subject: `You've been invited to join ${team.name} on Design QA Tool`,
-    html: `
-      <p>${inviter.email ?? "Someone"} invited you to join <strong>${team.name}</strong> as a <strong>${parsed.data.role}</strong> on Design QA Tool.</p>
-      <p><a href="${acceptUrl}">Accept the invitation</a></p>
-      <p>This link expires in 7 days.</p>
-    `,
+    ...invitationEmail({
+      inviterLabel: inviter.email ?? "Someone",
+      teamName: team.name,
+      role: parsed.data.role,
+      acceptUrl,
+    }),
   });
 
   revalidatePath("/team");

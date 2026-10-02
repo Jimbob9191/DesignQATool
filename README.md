@@ -20,6 +20,31 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Email
+
+All email is sent by the app through [Resend](https://resend.com) (`src/lib/email/`), including the auth emails — signup confirmation and password reset links are minted with Supabase's admin `generateLink()` and delivered by Resend, so Supabase's built-in SMTP is never used. Templates live in `src/lib/email/templates.ts`.
+
+| Email | Trigger |
+| --- | --- |
+| Confirm your account | Signing up with email + password (signing up again with an unconfirmed address resends it) |
+| Reset your password | `/forgot-password` |
+| Team invitation | Inviting someone from `/team` |
+| Mention / reply | Comment notifications (respecting each user's preferences) |
+
+### Setup
+
+1. **Verify a sending domain in Resend** — Resend dashboard → Domains → Add domain, then add the SPF/DKIM (and ideally DMARC) DNS records it shows and wait for it to verify. A subdomain such as `mail.yourdomain.com` keeps app mail reputation separate from your main domain.
+2. **Create an API key** — Resend dashboard → API Keys, with "Sending access" restricted to that domain.
+3. **Set the env vars** (see `.env.example`) locally and in your hosting provider:
+   - `RESEND_API_KEY`
+   - `EMAIL_FROM` — e.g. `Design QA Tool <no-reply@mail.yourdomain.com>`; must be on the verified domain
+   - `EMAIL_REPLY_TO` (optional)
+   - `NEXT_PUBLIC_SITE_URL` — the real public URL; every emailed link is built from it
+4. **Supabase → Authentication → Sign In / Providers → Email**: keep **Confirm email** enabled so unconfirmed accounts can't sign in with their password.
+5. *(Optional)* **Supabase → Authentication → Emails → SMTP Settings**: point Supabase at Resend's SMTP (`smtp.resend.com`, port `465`, user `resend`, password = an API key, sender = your `EMAIL_FROM` address). The app doesn't rely on this, but it means anything Supabase sends itself — e.g. users invited from the Supabase dashboard — also delivers reliably instead of hitting the built-in sender's tight rate limit.
+
+Without `RESEND_API_KEY`, nothing is sent; in development the would-be email, including its link, is printed to the `next dev` console so signup and reset can still be completed locally.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

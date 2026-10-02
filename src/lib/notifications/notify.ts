@@ -14,6 +14,7 @@ import {
   userPreferences,
 } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email/resend";
+import { commentNotificationEmail } from "@/lib/email/templates";
 import { env } from "@/lib/env";
 
 const MENTION_PATTERN = /@([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
@@ -114,15 +115,12 @@ export async function notifyCommentParticipants(input: {
 
         await sendEmail({
           to: recipient.email,
-          subject:
-            recipient.reason === "mention"
-              ? `${input.authorLabel} mentioned you on Design QA Tool`
-              : `${input.authorLabel} replied on Design QA Tool`,
-          html: `
-            <p>${input.authorLabel} ${recipient.reason === "mention" ? "mentioned you" : "replied"} on a pin:</p>
-            <p>"${input.commentBody}"</p>
-            <p><a href="${url}">View the comparison</a></p>
-          `,
+          ...commentNotificationEmail({
+            authorLabel: input.authorLabel,
+            reason: recipient.reason,
+            commentBody: input.commentBody,
+            url,
+          }),
         });
       })
     );

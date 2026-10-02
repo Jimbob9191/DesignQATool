@@ -15,6 +15,13 @@ import {
   signUpSchema,
   PASSWORD_MIN_LENGTH,
 } from "../src/lib/validations/auth.ts";
+import {
+  commentNotificationEmail,
+  escapeHtml,
+  invitationEmail,
+  passwordResetEmail,
+  signupConfirmationEmail,
+} from "../src/lib/email/templates.ts";
 
 test("initialAuthState starts idle with no messages", () => {
   assert.deepEqual(initialAuthState, { status: "idle" });
@@ -155,4 +162,47 @@ test("fieldErrorsFrom keeps only the first message per field", () => {
   assert.equal(errors.email, "Enter a valid email address");
   assert.ok(errors.password);
   assert.equal(Object.values(errors).every((m) => typeof m === "string"), true);
+});
+
+test("escapeHtml neutralises markup in user-supplied text", () => {
+  assert.equal(
+    escapeHtml(`<img src=x onerror="alert('x')"> & co`),
+    "&lt;img src=x onerror=&quot;alert(&#39;x&#39;)&quot;&gt; &amp; co"
+  );
+});
+
+test("signupConfirmationEmail puts the confirm link in both HTML and text bodies", () => {
+  const url = "https://qa.example.com/auth/confirm?token_hash=abc&type=signup&next=%2Fdashboard";
+  const email = signupConfirmationEmail({ confirmUrl: url });
+  assert.match(email.subject, /Confirm your/);
+  assert.ok(email.text.includes(url));
+  assert.ok(email.html.includes(url.replace(/&/g, "&amp;")), "href must be HTML-escaped");
+});
+
+test("passwordResetEmail includes the reset link", () => {
+  const url = "https://qa.example.com/auth/confirm?token_hash=abc&type=recovery";
+  const email = passwordResetEmail({ resetUrl: url });
+  assert.ok(email.text.includes(url));
+  assert.ok(email.html.includes(url.replace(/&/g, "&amp;")));
+});
+
+test("invitation and comment emails escape user-controlled fields in HTML", () => {
+  const invite = invitationEmail({
+    inviterLabel: "a@example.com",
+    teamName: "<b>Evil</b>",
+    role: "member",
+    acceptUrl: "https://qa.example.com/invite/accept?token=t",
+  });
+  assert.ok(!invite.html.includes("<b>Evil</b>"));
+  assert.ok(invite.html.includes("&lt;b&gt;Evil&lt;/b&gt;"));
+
+  const comment = commentNotificationEmail({
+    authorLabel: "Guest",
+    reason: "mention",
+    commentBody: '<a href="https://phish.example">click</a>',
+    url: "https://qa.example.com/x",
+  });
+  assert.ok(!comment.html.includes('<a href="https://phish.example">'));
+  assert.match(comment.subject, /mentioned you/);
+  assert.ok(comment.text.includes('<a href="https://phish.example">click</a>'), "text body stays verbatim");
 });
