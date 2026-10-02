@@ -65,18 +65,19 @@ export function friendlyAuthError(error: Pick<AuthError, "message" | "status">):
   return error.message;
 }
 
-/**
- * `next` arrives from a query string, so it is attacker-controllable. Only
- * same-origin absolute paths pass through — "//evil.com" is a
- * protocol-relative URL that would otherwise redirect off-site.
- */
 /** The raw email as typed, for echoing back into a rejected form. */
 export function submittedEmail(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/**
+ * `next` arrives from a query string, so it is attacker-controllable. Only
+ * same-origin absolute paths pass through — "//evil.com" is a
+ * protocol-relative URL that would otherwise redirect off-site, and browsers
+ * read "/\evil.com" the same way.
+ */
 export function safeNext(value: unknown): string {
-  if (typeof value === "string" && value.startsWith("/") && !value.startsWith("//")) {
+  if (typeof value === "string" && value.startsWith("/") && !/^\/[/\\]/.test(value)) {
     return value;
   }
   return "/dashboard";

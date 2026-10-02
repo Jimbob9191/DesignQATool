@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { Loader2, MailCheck, UserPlus } from "lucide-react";
 
-import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { signUpWithPassword } from "@/lib/actions/auth";
 import { initialAuthState } from "@/lib/auth/form-state";
 import { Button } from "@/components/ui/button";
@@ -41,9 +40,6 @@ export function SignupForm({ next }: { next?: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <GoogleButton next={next} />
-      <AuthDivider />
-
       <form action={formAction} className="flex flex-col gap-4">
         {next ? <input type="hidden" name="next" value={next} /> : null}
 
