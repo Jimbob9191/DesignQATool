@@ -1,5 +1,6 @@
 "use server";
 
+import type { EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
 import { env } from "@/lib/env";
@@ -11,6 +12,7 @@ import {
   type AuthFormState,
 } from "@/lib/auth/form-state";
 import { sendEmail } from "@/lib/email/resend";
+import { passwordResetEmail, signupConfirmationEmail } from "@/lib/email/templates";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -66,54 +68,70 @@ export async function signUpWithPassword(
   }
 
   const { email, password } = parsed.data;
-  const supabase = await createClient();
+  const next = safeNext(formData.get("next"));
 
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  // generateLink({ type: "signup" }) creates the unconfirmed user and mints a
+  // confirmation token WITHOUT sending anything, so delivery goes through
+  // Resend like every other email. supabase.auth.signUp() would hand delivery
+  // to Supabase's built-in SMTP, which only reaches the project's own team.
+  //
+  // For an address that already signed up but never confirmed, this mints a
+  // fresh token for the existing user instead (its original password stands),
+  // so "sign up again" doubles as "resend the confirmation email".
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.generateLink({ type: "signup", email, password });
 
   if (error) {
+    if (error.code === "email_exists" || /already (been )?registered/i.test(error.message)) {
+      return {
+        status: "error",
+        email,
+        message: "An account with that email already exists. Sign in instead.",
+        fieldErrors: { email: "Already registered" },
+      };
+    }
     return { status: "error", email, message: friendlyAuthError(error) };
   }
 
-  // Supabase hides "email already registered" to prevent account enumeration:
-  // it returns a decoy user with an empty identities array rather than an
-  // error. That's the only signal that the address is taken.
-  if (data.user && data.user.identities?.length === 0) {
-    return {
-      status: "error",
-      email,
-      message: "An account with that email already exists. Sign in instead.",
-      fieldErrors: { email: "Already registered" },
-    };
-  }
-
-  if (!data.user) {
+  if (!data.properties?.hashed_token) {
     return { status: "error", email, message: "Could not create your account. Try again." };
   }
 
-  // With "Confirm email" enabled on the project, signUp() returns no session
-  // and Supabase emails a link instead. This deployment has no working
-  // outbound email, so mark the address confirmed with the service-role key
-  // and open the session using the password we just set.
-  //
-  // Trade-off: signup no longer proves the user owns the address. Acceptable
-  // for an internal QA tool; revisit before opening signup to the public.
-  if (!data.session) {
-    const admin = createAdminClient();
-    const { error: confirmError } = await admin.auth.admin.updateUserById(data.user.id, {
-      email_confirm: true,
-    });
+  const sent = await sendEmail({
+    to: email,
+    ...signupConfirmationEmail({
+      confirmUrl: emailLinkUrl(data.properties.hashed_token, "signup", next),
+    }),
+  });
 
-    if (confirmError) {
-      return { status: "error", email, message: confirmError.message };
-    }
-
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInError) {
-      return { status: "error", email, message: friendlyAuthError(signInError) };
-    }
+  if (!sent.sent) {
+    console.error("[auth] signup confirmation email failed to send:", sent.error);
+    return {
+      status: "error",
+      email,
+      message: "We couldn't send your confirmation email. Wait a minute and try again.",
+    };
   }
 
-  redirect(safeNext(formData.get("next")));
+  return {
+    status: "success",
+    email,
+    message: `We sent a confirmation link to ${email}. Open it to finish creating your account.`,
+  };
+}
+
+/**
+ * Builds the /auth/confirm link that goes in an email. Deliberately not the
+ * action_link generateLink() returns: that one hands tokens back in the URL
+ * fragment, which only client-side JS can read, whereas token_hash is
+ * verified server-side in the route handler and sets the session cookie.
+ */
+function emailLinkUrl(tokenHash: string, type: EmailOtpType, next: string): string {
+  const url = new URL(`${env.NEXT_PUBLIC_SITE_URL}/auth/confirm`);
+  url.searchParams.set("token_hash", tokenHash);
+  url.searchParams.set("type", type);
+  url.searchParams.set("next", next);
+  return url.toString();
 }
 
 /** Where the recovery link drops the user once the token has been verified. */
@@ -122,9 +140,7 @@ const RESET_PASSWORD_PATH = "/reset-password";
 /**
  * Mints a recovery link and delivers it with Resend rather than calling
  * supabase.auth.resetPasswordForEmail(), which would hand delivery to
- * Supabase's built-in SMTP — the same outbound email that doesn't work on this
- * project (see signUpWithPassword). Resend is already the app's working mail
- * path for invites, so recovery rides on it too.
+ * Supabase's built-in SMTP (see signUpWithPassword).
  *
  * Returns nothing on purpose: every outcome, including "no such account",
  * looks identical to the caller.
@@ -141,22 +157,11 @@ async function deliverPasswordResetEmail(email: string): Promise<void> {
     return;
   }
 
-  // Build our own /auth/confirm URL instead of using data.properties.action_link.
-  // action_link returns tokens in the URL fragment, which only client-side JS
-  // can read; the token_hash flow verifies server-side in the route handler.
-  const confirmUrl = new URL(`${env.NEXT_PUBLIC_SITE_URL}/auth/confirm`);
-  confirmUrl.searchParams.set("token_hash", data.properties.hashed_token);
-  confirmUrl.searchParams.set("type", "recovery");
-  confirmUrl.searchParams.set("next", RESET_PASSWORD_PATH);
-
   const sent = await sendEmail({
     to: email,
-    subject: "Reset your Design QA Tool password",
-    html: `
-      <p>We got a request to reset the password for this Design QA Tool account.</p>
-      <p><a href="${confirmUrl.toString()}">Choose a new password</a></p>
-      <p>The link can only be used once and expires in about an hour. If you didn't ask for this, you can ignore this email — your password won't change.</p>
-    `,
+    ...passwordResetEmail({
+      resetUrl: emailLinkUrl(data.properties.hashed_token, "recovery", RESET_PASSWORD_PATH),
+    }),
   });
 
   if (!sent.sent) {

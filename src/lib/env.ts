@@ -8,6 +8,10 @@ export const env = createEnv({
     CAPTURE_SERVICE_URL: z.string().url().optional(),
     CAPTURE_SERVICE_SECRET: z.string().min(1).optional(),
     RESEND_API_KEY: z.string().min(1).optional(),
+    // "Name <address>" on a domain verified in Resend. Unset falls back to
+    // Resend's sandbox sender, which only delivers to the account owner.
+    EMAIL_FROM: z.string().min(1).optional(),
+    EMAIL_REPLY_TO: z.string().email().optional(),
   },
   client: {
     NEXT_PUBLIC_SUPABASE_URL: z.string().url(),

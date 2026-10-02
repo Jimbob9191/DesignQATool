@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { Loader2, UserPlus } from "lucide-react";
+import { Loader2, MailCheck, UserPlus } from "lucide-react";
 
 import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { signUpWithPassword } from "@/lib/actions/auth";
@@ -16,6 +16,28 @@ export function SignupForm({ next }: { next?: string }) {
   const [state, formAction, isPending] = useActionState(signUpWithPassword, initialAuthState);
 
   const loginHref = next ? `/login?next=${encodeURIComponent(next)}` : "/login";
+
+  // The account isn't usable until the emailed link is clicked, so the form
+  // swaps itself out for a "check your inbox" confirmation.
+  if (state.status === "success") {
+    return (
+      <div className="flex flex-col gap-4">
+        <div
+          className="flex flex-col items-center gap-2 rounded-lg border border-border bg-muted/40 p-4 text-center"
+          role="status"
+        >
+          <MailCheck className="h-5 w-5 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">{state.message}</p>
+        </div>
+        <p className="text-center text-xs text-muted-foreground">
+          Didn&apos;t get it? Check your spam folder, or sign up again with the same email to resend it.
+        </p>
+        <Button asChild variant="outline">
+          <Link href={loginHref}>Back to sign in</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">

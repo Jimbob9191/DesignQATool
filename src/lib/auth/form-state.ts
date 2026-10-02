@@ -11,8 +11,8 @@ export type AuthField = "email" | "password" | "confirmPassword";
 export type AuthFormState = {
   /**
    * "success" is only used by forms that finish without navigating away —
-   * currently just the reset request, which deliberately stays put and shows
-   * a confirmation rather than redirecting. Actions that end in redirect()
+   * signup and the reset request, which both stay put and tell the user to
+   * check their inbox rather than redirecting. Actions that end in redirect()
    * never return at all, so they only ever produce "idle" or "error".
    */
   status: "idle" | "error" | "success";
@@ -52,7 +52,7 @@ export function friendlyAuthError(error: Pick<AuthError, "message" | "status">):
     return "That email or password is incorrect.";
   }
   if (message.includes("email not confirmed")) {
-    return "That account still needs confirming. Try signing up again to finish setup.";
+    return "That account still needs confirming. Check your inbox for the confirmation link, or sign up again to get a new one.";
   }
   if (message.includes("rate limit") || error.status === 429) {
     return "Too many attempts. Wait a minute and try again.";
