@@ -226,28 +226,6 @@ export async function updatePassword(
   redirect("/dashboard");
 }
 
-export async function signInWithGoogle(formData: FormData) {
-  const next = formData.get("next");
-  const callbackUrl = new URL(`${env.NEXT_PUBLIC_SITE_URL}/auth/callback`);
-  if (typeof next === "string" && next) {
-    callbackUrl.searchParams.set("next", next);
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: callbackUrl.toString(),
-    },
-  });
-
-  if (error || !data.url) {
-    redirect(`/login?error=${encodeURIComponent(error?.message ?? "Could not start Google sign-in")}`);
-  }
-
-  redirect(data.url);
-}
-
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
