@@ -45,6 +45,21 @@ All email is sent by the app through [Resend](https://resend.com) (`src/lib/emai
 
 Without `RESEND_API_KEY`, nothing is sent; in development the would-be email, including its link, is printed to the `next dev` console so signup and reset can still be completed locally.
 
+## Capture service
+
+Live-site screenshots and PDF exports come from `capture-service/`, a small Fastify + Playwright (Chromium) server. The app calls it with `CAPTURE_SERVICE_URL` and authenticates with a shared bearer token, `CAPTURE_SERVICE_SECRET`; without them, captures fail with "Capture service is not configured."
+
+It runs on **Google Cloud Run** (project `designparity-capture`, region `us-east4`), scaled to zero when idle so normal usage stays inside the free tier. A £1/month budget alert on the project emails the billing owner if that ever changes. To redeploy after changing it:
+
+```bash
+cd capture-service
+gcloud run deploy capture-service --source . --project designparity-capture --region us-east4
+```
+
+Settings (2 vCPU, 2 GiB, concurrency 2, 90s timeout, 0–3 instances) and the secret persist between deploys. A full-page capture of a heavy page takes ~15–30s there, against the service's 60s capture limit.
+
+Locally: `cd capture-service && npm install && npx playwright install chromium`, put `CAPTURE_SERVICE_SECRET=<anything>` in `capture-service/.env.local`, run `npm run dev` (port 8787), and point the app's `.env.local` at `CAPTURE_SERVICE_URL=http://localhost:8787` with the same secret.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

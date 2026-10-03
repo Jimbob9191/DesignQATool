@@ -112,6 +112,11 @@ async function captureInContext(
   context: BrowserContext,
   request: CaptureRequest
 ): Promise<CaptureResult> {
+  // `npm run dev` runs through tsx, whose esbuild transform wraps named inner
+  // functions in a `__name(...)` helper. That helper doesn't exist inside the
+  // page, so every page.evaluate(...) of browser-scripts.ts would throw
+  // "__name is not defined". A no-op shim makes dev match the tsc build.
+  await context.addInitScript("globalThis.__name ??= (fn) => fn;");
   const page = await context.newPage();
   await page.goto(request.url, { waitUntil: "load", timeout: CAPTURE_TIMEOUT_MS });
 
