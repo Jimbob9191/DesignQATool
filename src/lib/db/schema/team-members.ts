@@ -1,8 +1,19 @@
 import { sql } from "drizzle-orm";
-import { pgPolicy, pgTable, primaryKey, timestamp, uuid } from "drizzle-orm/pg-core";
+import { type AnyPgColumn, pgPolicy, pgTable, primaryKey, timestamp, uuid } from "drizzle-orm/pg-core";
 import { authenticatedRole, authUsers } from "drizzle-orm/supabase";
 
 import { teamRoleEnum, teams } from "./teams";
+
+// Owners can manage any membership row; admins only non-owner rows. Applied
+// to both the old and new row on update, so an admin can neither touch an
+// owner nor promote anyone (themselves included) to owner — mirroring
+// updateMemberRole/removeMember for direct Supabase-client access.
+function managesMember(table: { teamId: AnyPgColumn; role: AnyPgColumn }) {
+  return sql`(
+        public.current_team_role(${table.teamId}) = 'owner'
+        or (public.current_team_role(${table.teamId}) = 'admin' and ${table.role} <> 'owner')
+      )`;
+}
 
 export const teamMembers = pgTable(
   "team_members",
@@ -34,17 +45,22 @@ export const teamMembers = pgTable(
       withCheck: sql`(
         ${table.userId} = auth.uid()
         and public.team_member_count(${table.teamId}) = 0
-      ) or public.current_team_role(${table.teamId}) in ('owner', 'admin')`,
+      ) or ${managesMember(table)}`,
     }),
+    // withCheck matters as much as using here: without it, an admin could
+    // update their own row to role='owner'.
     pgPolicy("team_members_update_owner_admin", {
       for: "update",
       to: authenticatedRole,
-      using: sql`public.current_team_role(${table.teamId}) in ('owner', 'admin')`,
+      using: managesMember(table),
+      withCheck: managesMember(table),
     }),
+    // Anyone but an owner may remove their own row (leaveTeam); everything
+    // else follows managesMember, so admins can't remove owners.
     pgPolicy("team_members_delete_owner_admin_or_self", {
       for: "delete",
       to: authenticatedRole,
-      using: sql`${table.userId} = auth.uid() or public.current_team_role(${table.teamId}) in ('owner', 'admin')`,
+      using: sql`(${table.userId} = auth.uid() and ${table.role} <> 'owner') or ${managesMember(table)}`,
     }),
   ]
 ).enableRLS();

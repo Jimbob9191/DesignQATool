@@ -8,6 +8,7 @@ import {
   type ElementMapEntry,
 } from "./browser-scripts.js";
 import { fitWithinWebpLimits } from "./image-fit.js";
+import { isAllowedUrl } from "./url-guard.js";
 
 export const PRESET_VIEWPORTS = [390, 768, 1440] as const;
 export type PresetViewport = (typeof PRESET_VIEWPORTS)[number];
@@ -81,10 +82,27 @@ export async function runPdf(url: string): Promise<Buffer> {
 }
 
 export async function runCapture(request: CaptureRequest): Promise<CaptureResult> {
+  const lookups = new Map<string, Promise<boolean>>();
+  if (!(await isAllowedUrl(request.url, lookups))) {
+    throw new Error("Only public http(s) URLs can be captured.");
+  }
+
   const browser = await getBrowser();
   const context = await browser.newContext({
     viewport: { width: request.viewportWidth, height: DEFAULT_VIEWPORT_HEIGHT },
     deviceScaleFactor: request.deviceScaleFactor ?? 1,
+    // Requests from a service worker skip context.route() below.
+    serviceWorkers: "block",
+  });
+
+  // Re-checks every request, so a public page can't redirect or embed its
+  // way onto a private address.
+  await context.route("**/*", async (route) => {
+    if (await isAllowedUrl(route.request().url(), lookups)) {
+      await route.continue();
+    } else {
+      await route.abort("blockedbyclient");
+    }
   });
 
   let timedOut = false;

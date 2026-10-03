@@ -37,7 +37,7 @@ export const comments = pgTable(
     pgPolicy("comments_insert_non_viewer", {
       for: "insert",
       to: authenticatedRole,
-      withCheck: sql`exists (
+      withCheck: sql`${table.createdBy} = auth.uid() and exists (
         select 1 from annotations
         join comparisons on comparisons.id = annotations.comparison_id
         join pages on pages.id = comparisons.page_id
@@ -45,10 +45,19 @@ export const comments = pgTable(
         where annotations.id = ${table.annotationId} and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')
       )`,
     }),
+    // withCheck stops an edit from moving the comment onto a pin in a team
+    // the author doesn't belong to.
     pgPolicy("comments_update_own", {
       for: "update",
       to: authenticatedRole,
       using: sql`${table.createdBy} = auth.uid()`,
+      withCheck: sql`${table.createdBy} = auth.uid() and exists (
+        select 1 from annotations
+        join comparisons on comparisons.id = annotations.comparison_id
+        join pages on pages.id = comparisons.page_id
+        join projects on projects.id = pages.project_id
+        where annotations.id = ${table.annotationId} and public.current_team_role(projects.team_id) is not null
+      )`,
     }),
     pgPolicy("comments_delete_own", {
       for: "delete",

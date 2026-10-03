@@ -15,7 +15,9 @@ type ActionResult<T> = { success: true; data: T } | { success: false; error: str
 
 const startCaptureSchema = z.object({
   pageId: z.uuid(),
-  url: z.string().url(),
+  // capture-service also refuses private/internal hosts; this just rejects
+  // file:, javascript: and friends before a capture row is ever created.
+  url: z.url({ protocol: /^https?$/ }),
   viewportWidth: z.union([
     z.literal(PRESET_VIEWPORTS[0]),
     z.literal(PRESET_VIEWPORTS[1]),

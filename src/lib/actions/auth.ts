@@ -1,5 +1,7 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
+
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
@@ -12,6 +14,7 @@ import {
   type AuthFormState,
 } from "@/lib/auth/form-state";
 import { sendEmail } from "@/lib/email/resend";
+import { clientIp, consumeRateLimits } from "@/lib/rate-limit";
 import { passwordResetEmail, signupConfirmationEmail } from "@/lib/email/templates";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -21,6 +24,11 @@ import {
   signInSchema,
   signUpSchema,
 } from "@/lib/validations/auth";
+
+const TOO_MANY_ATTEMPTS = "Too many attempts. Wait a few minutes and try again.";
+
+const MINUTE = 60;
+const HOUR = 60 * MINUTE;
 
 export async function signInWithPassword(
   _prevState: AuthFormState,
@@ -37,6 +45,18 @@ export async function signInWithPassword(
     return { status: "error", email, fieldErrors: fieldErrorsFrom(parsed.error) };
   }
 
+  // Supabase's own per-IP limit doesn't help here: every sign-in reaches it
+  // from this server, so all users share one bucket. Throttle per client IP
+  // (password spraying) and per account (guessing one person's password).
+  const ip = await clientIp();
+  const allowed = await consumeRateLimits([
+    [`signin:ip:${ip}`, 30, 10 * MINUTE],
+    [`signin:email:${parsed.data.email.toLowerCase()}`, 10, 10 * MINUTE],
+  ]);
+  if (!allowed) {
+    return { status: "error", email, message: TOO_MANY_ATTEMPTS };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
@@ -51,24 +71,31 @@ export async function signInWithPassword(
   redirect(safeNext(formData.get("next")));
 }
 
-export async function signUpWithPassword(
+export async function signUp(
   _prevState: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
   const rawEmail = submittedEmail(formData.get("email"));
 
-  const parsed = signUpSchema.safeParse({
-    email: formData.get("email"),
-    password: formData.get("password"),
-    confirmPassword: formData.get("confirmPassword"),
-  });
+  const parsed = signUpSchema.safeParse({ email: formData.get("email") });
 
   if (!parsed.success) {
     return { status: "error", email: rawEmail, fieldErrors: fieldErrorsFrom(parsed.error) };
   }
 
-  const { email, password } = parsed.data;
+  const { email } = parsed.data;
   const next = safeNext(formData.get("next"));
+
+  // Every signup sends an email, so without a cap this form could be used to
+  // flood any inbox from our domain and burn the Resend quota.
+  const ip = await clientIp();
+  const allowed = await consumeRateLimits([
+    [`signup:ip:${ip}`, 10, HOUR],
+    [`signup:email:${email.toLowerCase()}`, 3, HOUR],
+  ]);
+  if (!allowed) {
+    return { status: "error", email, message: TOO_MANY_ATTEMPTS };
+  }
 
   // generateLink({ type: "signup" }) creates the unconfirmed user and mints a
   // confirmation token WITHOUT sending anything, so delivery goes through
@@ -76,10 +103,18 @@ export async function signUpWithPassword(
   // to Supabase's built-in SMTP, which only reaches the project's own team.
   //
   // For an address that already signed up but never confirmed, this mints a
-  // fresh token for the existing user instead (its original password stands),
-  // so "sign up again" doubles as "resend the confirmation email".
+  // fresh token for the existing user instead, so "sign up again" doubles as
+  // "resend the confirmation email".
+  //
+  // The password is random and never shown to anyone: the real one is chosen
+  // after the link is clicked (see emailLinkUrl's next below), once the person
+  // has proved they own the mailbox.
   const admin = createAdminClient();
-  const { data, error } = await admin.auth.admin.generateLink({ type: "signup", email, password });
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: "signup",
+    email,
+    password: unguessablePassword(),
+  });
 
   if (error) {
     if (error.code === "email_exists" || /already (been )?registered/i.test(error.message)) {
@@ -97,10 +132,21 @@ export async function signUpWithPassword(
     return { status: "error", email, message: "Could not create your account. Try again." };
   }
 
+  // generateLink keeps an existing unconfirmed user's password, which may have
+  // been set by someone else (or by the old flow, which took a password at
+  // signup). Overwrite it so whoever confirms is the only one who can get in.
+  const { error: resetError } = await admin.auth.admin.updateUserById(data.user.id, {
+    password: unguessablePassword(),
+  });
+  if (resetError) {
+    console.error("[auth] could not reset unconfirmed user's password:", resetError.message);
+    return { status: "error", email, message: "Could not create your account. Try again." };
+  }
+
   const sent = await sendEmail({
     to: email,
     ...signupConfirmationEmail({
-      confirmUrl: emailLinkUrl(data.properties.hashed_token, "signup", next),
+      confirmUrl: emailLinkUrl(data.properties.hashed_token, "signup", setPasswordPath(next)),
     }),
   });
 
@@ -121,6 +167,22 @@ export async function signUpWithPassword(
 }
 
 /**
+ * Where the recovery link drops the user once the token has been verified —
+ * and, in setup mode, where a newly confirmed user picks their first password.
+ */
+const RESET_PASSWORD_PATH = "/reset-password";
+
+/** A password nobody knows, for accounts whose real one isn't chosen yet. */
+function unguessablePassword(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+/** The confirmed user's first stop: choose a password, then carry on to `next`. */
+function setPasswordPath(next: string): string {
+  return `${RESET_PASSWORD_PATH}?setup=1&next=${encodeURIComponent(next)}`;
+}
+
+/**
  * Builds the /auth/confirm link that goes in an email. Deliberately not the
  * action_link generateLink() returns: that one hands tokens back in the URL
  * fragment, which only client-side JS can read, whereas token_hash is
@@ -133,9 +195,6 @@ function emailLinkUrl(tokenHash: string, type: EmailOtpType, next: string): stri
   url.searchParams.set("next", next);
   return url.toString();
 }
-
-/** Where the recovery link drops the user once the token has been verified. */
-const RESET_PASSWORD_PATH = "/reset-password";
 
 /**
  * Mints a recovery link and delivers it with Resend rather than calling
@@ -178,6 +237,17 @@ export async function requestPasswordReset(
   const parsed = forgotPasswordSchema.safeParse({ email: formData.get("email") });
   if (!parsed.success) {
     return { status: "error", email, fieldErrors: fieldErrorsFrom(parsed.error) };
+  }
+
+  // Applied before looking the account up, so being throttled says nothing
+  // about whether the address is registered.
+  const ip = await clientIp();
+  const allowed = await consumeRateLimits([
+    [`reset:ip:${ip}`, 10, HOUR],
+    [`reset:email:${parsed.data.email.toLowerCase()}`, 3, HOUR],
+  ]);
+  if (!allowed) {
+    return { status: "error", email, message: TOO_MANY_ATTEMPTS };
   }
 
   await deliverPasswordResetEmail(parsed.data.email);
@@ -223,7 +293,7 @@ export async function updatePassword(
     return { status: "error", message: friendlyAuthError(error) };
   }
 
-  redirect("/dashboard");
+  redirect(safeNext(formData.get("next")));
 }
 
 export async function signOut() {

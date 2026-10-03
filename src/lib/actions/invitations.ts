@@ -14,6 +14,7 @@ import { invitations, teamMembers } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email/resend";
 import { invitationEmail } from "@/lib/email/templates";
 import { env } from "@/lib/env";
+import { consumeRateLimits } from "@/lib/rate-limit";
 
 type ActionResult<T> =
   | { success: true; data: T; warning?: string }
@@ -37,6 +38,15 @@ export async function inviteMember(input: unknown): Promise<ActionResult<{ id: s
   if (!inviter) return { success: false, error: "Not signed in." };
 
   const email = parsed.data.email.toLowerCase();
+
+  // Each invite emails an arbitrary address from our domain.
+  const allowed = await consumeRateLimits([
+    [`invite:user:${inviter.id}`, 20, 60 * 60],
+    [`invite:team:${team.id}`, 50, 60 * 60],
+  ]);
+  if (!allowed) {
+    return { success: false, error: "Too many invites sent recently. Try again in an hour." };
+  }
 
   const [existingMember] = await db
     .select({ userId: teamMembers.userId })

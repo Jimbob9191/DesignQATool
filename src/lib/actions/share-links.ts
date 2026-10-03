@@ -13,6 +13,7 @@ import { db } from "@/lib/db";
 import { annotations, comments, comparisons, pages, projects, shareLinks } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { notifyCommentParticipants } from "@/lib/notifications/notify";
+import { clientIp, consumeRateLimits } from "@/lib/rate-limit";
 
 type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
 
@@ -116,6 +117,17 @@ export async function addAnonymousComment(
   }
   if (!shareLink.allowAnonymousComments) {
     return { success: false, error: "Comments aren't enabled on this share link." };
+  }
+
+  // Anyone holding the link can post, and each comment can email the team,
+  // so cap both a single visitor and the link as a whole.
+  const ip = await clientIp();
+  const allowed = await consumeRateLimits([
+    [`guest-comment:ip:${ip}`, 10, 10 * 60],
+    [`guest-comment:link:${shareLink.id}`, 60, 60 * 60],
+  ]);
+  if (!allowed) {
+    return { success: false, error: "Too many comments. Wait a few minutes and try again." };
   }
 
   const [annotation] = await db
