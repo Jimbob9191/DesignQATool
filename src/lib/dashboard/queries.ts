@@ -134,64 +134,64 @@ export type ActivityItem =
 export async function getActivityFeed(teamId: string, limit = 15): Promise<ActivityItem[]> {
   const commentAuthor = authUsers;
 
-  const recentComments = await db
-    .select({
-      id: comments.id,
-      body: comments.body,
-      authorEmail: commentAuthor.email,
-      guestName: comments.guestName,
-      createdAt: comments.createdAt,
-      comparisonId: annotations.comparisonId,
-      pageId: pages.id,
-      projectSlug: projects.slug,
-      pageName: pages.name,
-    })
-    .from(comments)
-    .leftJoin(commentAuthor, eq(comments.createdBy, commentAuthor.id))
-    .innerJoin(annotations, eq(comments.annotationId, annotations.id))
-    .innerJoin(comparisons, eq(annotations.comparisonId, comparisons.id))
-    .innerJoin(pages, eq(comparisons.pageId, pages.id))
-    .innerJoin(projects, eq(pages.projectId, projects.id))
-    .where(eq(projects.teamId, teamId))
-    .orderBy(desc(comments.createdAt))
-    .limit(limit);
-
-  const recentAnnotations = await db
-    .select({
-      id: annotations.id,
-      authorEmail: authUsers.email,
-      createdAt: annotations.createdAt,
-      comparisonId: annotations.comparisonId,
-      pageId: pages.id,
-      projectSlug: projects.slug,
-      pageName: pages.name,
-    })
-    .from(annotations)
-    .innerJoin(authUsers, eq(annotations.createdBy, authUsers.id))
-    .innerJoin(comparisons, eq(annotations.comparisonId, comparisons.id))
-    .innerJoin(pages, eq(comparisons.pageId, pages.id))
-    .innerJoin(projects, eq(pages.projectId, projects.id))
-    .where(eq(projects.teamId, teamId))
-    .orderBy(desc(annotations.createdAt))
-    .limit(limit);
-
-  const recentComparisons = await db
-    .select({
-      id: comparisons.id,
-      name: comparisons.name,
-      authorEmail: authUsers.email,
-      createdAt: comparisons.createdAt,
-      pageId: pages.id,
-      projectSlug: projects.slug,
-      pageName: pages.name,
-    })
-    .from(comparisons)
-    .innerJoin(authUsers, eq(comparisons.createdBy, authUsers.id))
-    .innerJoin(pages, eq(comparisons.pageId, pages.id))
-    .innerJoin(projects, eq(pages.projectId, projects.id))
-    .where(eq(projects.teamId, teamId))
-    .orderBy(desc(comparisons.createdAt))
-    .limit(limit);
+  const [recentComments, recentAnnotations, recentComparisons] = await Promise.all([
+    db
+      .select({
+        id: comments.id,
+        body: comments.body,
+        authorEmail: commentAuthor.email,
+        guestName: comments.guestName,
+        createdAt: comments.createdAt,
+        comparisonId: annotations.comparisonId,
+        pageId: pages.id,
+        projectSlug: projects.slug,
+        pageName: pages.name,
+      })
+      .from(comments)
+      .leftJoin(commentAuthor, eq(comments.createdBy, commentAuthor.id))
+      .innerJoin(annotations, eq(comments.annotationId, annotations.id))
+      .innerJoin(comparisons, eq(annotations.comparisonId, comparisons.id))
+      .innerJoin(pages, eq(comparisons.pageId, pages.id))
+      .innerJoin(projects, eq(pages.projectId, projects.id))
+      .where(eq(projects.teamId, teamId))
+      .orderBy(desc(comments.createdAt))
+      .limit(limit),
+    db
+      .select({
+        id: annotations.id,
+        authorEmail: authUsers.email,
+        createdAt: annotations.createdAt,
+        comparisonId: annotations.comparisonId,
+        pageId: pages.id,
+        projectSlug: projects.slug,
+        pageName: pages.name,
+      })
+      .from(annotations)
+      .innerJoin(authUsers, eq(annotations.createdBy, authUsers.id))
+      .innerJoin(comparisons, eq(annotations.comparisonId, comparisons.id))
+      .innerJoin(pages, eq(comparisons.pageId, pages.id))
+      .innerJoin(projects, eq(pages.projectId, projects.id))
+      .where(eq(projects.teamId, teamId))
+      .orderBy(desc(annotations.createdAt))
+      .limit(limit),
+    db
+      .select({
+        id: comparisons.id,
+        name: comparisons.name,
+        authorEmail: authUsers.email,
+        createdAt: comparisons.createdAt,
+        pageId: pages.id,
+        projectSlug: projects.slug,
+        pageName: pages.name,
+      })
+      .from(comparisons)
+      .innerJoin(authUsers, eq(comparisons.createdBy, authUsers.id))
+      .innerJoin(pages, eq(comparisons.pageId, pages.id))
+      .innerJoin(projects, eq(pages.projectId, projects.id))
+      .where(eq(projects.teamId, teamId))
+      .orderBy(desc(comparisons.createdAt))
+      .limit(limit),
+  ]);
 
   const merged: ActivityItem[] = [
     ...recentComments.map((r) => ({

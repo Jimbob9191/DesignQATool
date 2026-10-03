@@ -16,20 +16,21 @@ export default async function TeamPage() {
   const { team, role } = await getCurrentTeam();
   const canManage = role === "owner" || role === "admin";
 
-  const members = await db
-    .select({ userId: teamMembers.userId, role: teamMembers.role, email: authUsers.email })
-    .from(teamMembers)
-    .innerJoin(authUsers, eq(teamMembers.userId, authUsers.id))
-    .where(eq(teamMembers.teamId, team.id))
-    .orderBy(asc(teamMembers.createdAt));
-
-  const pendingInvitations = canManage
-    ? await db
-        .select({ id: invitations.id, email: invitations.email, role: invitations.role })
-        .from(invitations)
-        .where(and(eq(invitations.teamId, team.id), eq(invitations.status, "pending")))
-        .orderBy(desc(invitations.createdAt))
-    : [];
+  const [members, pendingInvitations] = await Promise.all([
+    db
+      .select({ userId: teamMembers.userId, role: teamMembers.role, email: authUsers.email })
+      .from(teamMembers)
+      .innerJoin(authUsers, eq(teamMembers.userId, authUsers.id))
+      .where(eq(teamMembers.teamId, team.id))
+      .orderBy(asc(teamMembers.createdAt)),
+    canManage
+      ? db
+          .select({ id: invitations.id, email: invitations.email, role: invitations.role })
+          .from(invitations)
+          .where(and(eq(invitations.teamId, team.id), eq(invitations.status, "pending")))
+          .orderBy(desc(invitations.createdAt))
+      : [],
+  ]);
 
   return (
     <div className="flex flex-col gap-6">

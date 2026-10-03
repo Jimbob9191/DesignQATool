@@ -40,9 +40,12 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() refreshes an expiring session (writing the new cookies via
+  // setAll above) and verifies the JWT locally with asymmetric signing keys,
+  // so most requests skip the round trip to Supabase Auth that getUser()
+  // always makes.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   const { pathname, search } = request.nextUrl;
 
