@@ -4,7 +4,7 @@ export const PASSWORD_MIN_LENGTH = 8;
 
 const emailField = z.string().trim().email("Enter a valid email address");
 
-// Shared by every form that sets a password (signup, reset) so the rule can
+// Shared by every form that sets a password (post-signup setup, reset) so the rule can
 // only ever be changed in one place.
 const newPasswordField = z
   .string()
@@ -27,13 +27,12 @@ export const signInSchema = z.object({
   password: z.string().min(1, "Enter your password"),
 });
 
-export const signUpSchema = z
-  .object({
-    email: emailField,
-    password: newPasswordField,
-    confirmPassword: confirmPasswordField,
-  })
-  .refine(passwordsMatch, mismatchError());
+// Email only: the password is chosen after the confirmation link is clicked.
+// Taking it up front would let anyone who signs up with an address they don't
+// own pick the password the real owner then unknowingly confirms.
+export const signUpSchema = z.object({
+  email: emailField,
+});
 
 export const forgotPasswordSchema = z.object({
   email: emailField,

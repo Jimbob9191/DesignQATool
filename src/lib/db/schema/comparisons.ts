@@ -33,12 +33,17 @@ export const comparisons = pgTable(
         where pages.id = ${table.pageId} and public.current_team_role(projects.team_id) is not null
       )`,
     }),
+    // Both assets must belong to the page's team: the comparison view signs
+    // URLs for them server-side, so a foreign asset id here would leak
+    // another team's image.
     pgPolicy("comparisons_insert_non_viewer", {
       for: "insert",
       to: authenticatedRole,
-      withCheck: sql`exists (
+      withCheck: sql`${table.createdBy} = auth.uid() and exists (
         select 1 from pages join projects on projects.id = pages.project_id
         where pages.id = ${table.pageId} and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')
+          and exists (select 1 from assets where assets.id = ${table.designAssetId} and assets.team_id = projects.team_id)
+          and exists (select 1 from assets where assets.id = ${table.captureAssetId} and assets.team_id = projects.team_id)
       )`,
     }),
     pgPolicy("comparisons_delete_non_viewer", {

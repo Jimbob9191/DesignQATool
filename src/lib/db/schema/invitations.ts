@@ -32,10 +32,15 @@ export const invitations = pgTable(
       to: authenticatedRole,
       using: sql`public.current_team_role(${table.teamId}) in ('owner', 'admin')`,
     }),
+    // Never role='owner': accepting one would let an admin mint an owner
+    // (e.g. an alt account of their own). Ownership is only ever granted
+    // through updateMemberRole by an existing owner.
     pgPolicy("invitations_insert_owner_admin", {
       for: "insert",
       to: authenticatedRole,
-      withCheck: sql`public.current_team_role(${table.teamId}) in ('owner', 'admin')`,
+      withCheck: sql`public.current_team_role(${table.teamId}) in ('owner', 'admin')
+        and ${table.role} <> 'owner'
+        and ${table.invitedBy} = auth.uid()`,
     }),
     pgPolicy("invitations_delete_owner_admin", {
       for: "delete",

@@ -31,7 +31,13 @@ const createAnnotationSchema = z.object({
 
 async function assertComparisonInTeam(comparisonId: string, teamId: string) {
   const [row] = await db
-    .select({ id: comparisons.id, pageId: comparisons.pageId, projectSlug: projects.slug })
+    .select({
+      id: comparisons.id,
+      pageId: comparisons.pageId,
+      projectSlug: projects.slug,
+      designAssetId: comparisons.designAssetId,
+      captureAssetId: comparisons.captureAssetId,
+    })
     .from(comparisons)
     .innerJoin(pages, eq(comparisons.pageId, pages.id))
     .innerJoin(projects, eq(pages.projectId, projects.id))
@@ -55,6 +61,14 @@ export async function createAnnotation(
   const comparison = await assertComparisonInTeam(parsed.data.comparisonId, team.id);
   if (!comparison) {
     return { success: false, error: "Comparison not found." };
+  }
+
+  // A pin sits on one of this comparison's two images, never an arbitrary
+  // asset id from the client.
+  const expectedAssetId =
+    parsed.data.target === "design" ? comparison.designAssetId : comparison.captureAssetId;
+  if (parsed.data.assetId !== expectedAssetId) {
+    return { success: false, error: "That image isn't part of this comparison." };
   }
 
   const [annotation] = await db

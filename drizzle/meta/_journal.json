@@ -120,6 +120,20 @@
       "when": 1785426636076,
       "tag": "0016_broad_king_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791015103853,
+      "tag": "0017_tighten_rls_and_rate_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791015113360,
+      "tag": "0018_restrict_helper_function_execute",
+      "breakpoints": true
     }
   ]
 }

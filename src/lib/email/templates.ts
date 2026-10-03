@@ -51,12 +51,12 @@ export function signupConfirmationEmail(input: { confirmUrl: string }): EmailCon
   return {
     subject: `Confirm your ${PRODUCT_NAME} account`,
     html: layout({
-      paragraphs: [`Thanks for signing up. Confirm your email address to finish creating your account.`],
+      paragraphs: [`Thanks for signing up. Confirm your email address, then choose a password to finish creating your account.`],
       action: { label: "Confirm email address", url: input.confirmUrl },
       footer: "If you didn't create an account, you can ignore this email.",
     }),
     text: [
-      `Thanks for signing up for ${PRODUCT_NAME}. Confirm your email address to finish creating your account:`,
+      `Thanks for signing up for ${PRODUCT_NAME}. Confirm your email address, then choose a password to finish creating your account:`,
       "",
       input.confirmUrl,
       "",

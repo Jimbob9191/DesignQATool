@@ -26,7 +26,7 @@ All email is sent by the app through [Resend](https://resend.com) (`src/lib/emai
 
 | Email | Trigger |
 | --- | --- |
-| Confirm your account | Signing up with email + password (signing up again with an unconfirmed address resends it) |
+| Confirm your account | Signing up with an email address (signing up again with an unconfirmed address resends it). The password is chosen after the link is opened, so nobody can pre-set one for an address they don't own |
 | Reset your password | `/forgot-password` |
 | Team invitation | Inviting someone from `/team` |
 | Mention / reply | Comment notifications (respecting each user's preferences) |

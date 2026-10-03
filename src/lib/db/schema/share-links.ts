@@ -39,7 +39,7 @@ export const shareLinks = pgTable(
     pgPolicy("share_links_insert_non_viewer", {
       for: "insert",
       to: authenticatedRole,
-      withCheck: sql`exists (
+      withCheck: sql`${table.createdBy} = auth.uid() and exists (
         select 1 from comparisons
         join pages on pages.id = comparisons.page_id
         join projects on projects.id = pages.project_id

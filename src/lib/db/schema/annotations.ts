@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   integer,
   jsonb,
   numeric,
@@ -29,6 +30,17 @@ export const annotationStatusEnum = pgEnum("annotation_status", [
 // by re-resolving the selector and reapplying the same relative offset
 // within its new bounding box. x_ratio/y_px alone are the fallback used
 // when there's no selector (design-pane pins) or it fails to re-resolve.
+// The caller can edit the comparison, and asset_id is one of that team's assets.
+function editableWithTeamAsset(table: { comparisonId: AnyPgColumn; assetId: AnyPgColumn }) {
+  return sql`exists (
+        select 1 from comparisons
+        join pages on pages.id = comparisons.page_id
+        join projects on projects.id = pages.project_id
+        where comparisons.id = ${table.comparisonId} and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')
+          and exists (select 1 from assets where assets.id = ${table.assetId} and assets.team_id = projects.team_id)
+      )`;
+}
+
 export const annotations = pgTable(
   "annotations",
   {
@@ -64,12 +76,7 @@ export const annotations = pgTable(
     pgPolicy("annotations_insert_non_viewer", {
       for: "insert",
       to: authenticatedRole,
-      withCheck: sql`exists (
-        select 1 from comparisons
-        join pages on pages.id = comparisons.page_id
-        join projects on projects.id = pages.project_id
-        where comparisons.id = ${table.comparisonId} and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')
-      )`,
+      withCheck: sql`${table.createdBy} = auth.uid() and ${editableWithTeamAsset(table)}`,
     }),
     pgPolicy("annotations_update_non_viewer", {
       for: "update",
@@ -80,6 +87,7 @@ export const annotations = pgTable(
         join projects on projects.id = pages.project_id
         where comparisons.id = ${table.comparisonId} and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')
       )`,
+      withCheck: editableWithTeamAsset(table),
     }),
     pgPolicy("annotations_delete_non_viewer", {
       for: "delete",

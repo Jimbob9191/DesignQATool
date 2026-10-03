@@ -48,7 +48,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
   ]);
 
   const annotationRows = await db
-    .select({ annotation: annotations, authorEmail: authUsers.email })
+    .select({ annotation: annotations })
     .from(annotations)
     .innerJoin(authUsers, eq(annotations.createdBy, authUsers.id))
     .where(eq(annotations.comparisonId, shareLink.comparisonId))
@@ -75,7 +75,14 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
       .map((c) => ({
         id: c.comment.id,
         body: c.comment.body,
-        authorEmail: c.authorEmail ?? c.comment.guestName ?? "Anonymous",
+        // Anyone with the link can read this page, so team members appear by
+        // the name part of their address only — never a full, contactable
+        // email. Guests are labelled so they can't pass as a team member.
+        authorName: c.authorEmail
+          ? c.authorEmail.split("@")[0]
+          : c.comment.guestName
+            ? `${c.comment.guestName} (guest)`
+            : "Anonymous",
         createdAt: c.comment.createdAt.toISOString(),
       })),
   }));

@@ -89,34 +89,20 @@ test("signInSchema does NOT enforce the signup length minimum", () => {
   assert.equal(result.success, true, "existing short passwords must still be able to sign in");
 });
 
-test("signUpSchema accepts a valid matching pair", () => {
+test("signUpSchema asks only for an email — the password is set after confirming", () => {
   const result = signUpSchema.safeParse({
-    email: "new@example.com",
-    password: "correct-horse",
-    confirmPassword: "correct-horse",
+    email: "  new@example.com ",
+    password: "attacker-chosen",
+    confirmPassword: "attacker-chosen",
   });
   assert.equal(result.success, true);
+  assert.deepEqual(result.data, { email: "new@example.com" });
 });
 
-test("signUpSchema enforces the minimum password length", () => {
-  const short = "a".repeat(PASSWORD_MIN_LENGTH - 1);
-  const result = signUpSchema.safeParse({
-    email: "new@example.com",
-    password: short,
-    confirmPassword: short,
-  });
+test("signUpSchema rejects an invalid email", () => {
+  const result = signUpSchema.safeParse({ email: "nope" });
   assert.equal(result.success, false);
-  assert.match(fieldErrorsFrom(result.error).password, /at least 8 characters/);
-});
-
-test("signUpSchema rejects mismatched passwords on the confirm field", () => {
-  const result = signUpSchema.safeParse({
-    email: "new@example.com",
-    password: "correct-horse",
-    confirmPassword: "correct-horsf",
-  });
-  assert.equal(result.success, false);
-  assert.equal(fieldErrorsFrom(result.error).confirmPassword, "Passwords do not match");
+  assert.equal(fieldErrorsFrom(result.error).email, "Enter a valid email address");
 });
 
 test("forgotPasswordSchema accepts and trims an email, and asks for nothing else", () => {
@@ -157,11 +143,11 @@ test("resetPasswordSchema rejects mismatched passwords on the confirm field", ()
 });
 
 test("fieldErrorsFrom keeps only the first message per field", () => {
-  const result = signUpSchema.safeParse({ email: "nope", password: "x", confirmPassword: "" });
+  const result = resetPasswordSchema.safeParse({ password: "x", confirmPassword: "" });
   assert.equal(result.success, false);
   const errors = fieldErrorsFrom(result.error);
-  assert.equal(errors.email, "Enter a valid email address");
-  assert.ok(errors.password);
+  assert.match(errors.password, /at least 8 characters/);
+  assert.equal(errors.confirmPassword, "Re-enter your password");
   assert.equal(Object.values(errors).every((m) => typeof m === "string"), true);
 });
 

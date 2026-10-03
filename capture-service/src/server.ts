@@ -11,7 +11,7 @@ if (!CAPTURE_SERVICE_SECRET) {
 }
 
 const captureRequestSchema = z.object({
-  url: z.string().url(),
+  url: z.url({ protocol: /^https?$/ }),
   viewportWidth: z.union([
     z.literal(PRESET_VIEWPORTS[0]),
     z.literal(PRESET_VIEWPORTS[1]),

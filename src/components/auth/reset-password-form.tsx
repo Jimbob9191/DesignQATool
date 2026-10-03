@@ -11,14 +11,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PASSWORD_MIN_LENGTH } from "@/lib/validations/auth";
 
-export function ResetPasswordForm() {
+export function ResetPasswordForm({ next, isSetup = false }: { next?: string; isSetup?: boolean }) {
   const [state, formAction, isPending] = useActionState(updatePassword, initialAuthState);
 
   return (
     <div className="flex flex-col gap-6">
       <form action={formAction} className="flex flex-col gap-4">
+        {next ? <input type="hidden" name="next" value={next} /> : null}
+
         <div className="flex flex-col gap-2">
-          <Label htmlFor="password">New password</Label>
+          <Label htmlFor="password">{isSetup ? "Password" : "New password"}</Label>
           <Input
             id="password"
             name="password"
@@ -39,7 +41,7 @@ export function ResetPasswordForm() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="confirmPassword">Confirm new password</Label>
+          <Label htmlFor="confirmPassword">{isSetup ? "Confirm password" : "Confirm new password"}</Label>
           <Input
             id="confirmPassword"
             name="confirmPassword"
@@ -60,7 +62,7 @@ export function ResetPasswordForm() {
           ) : (
             <KeyRound className="h-4 w-4" />
           )}
-          Update password
+          {isSetup ? "Set password" : "Update password"}
         </Button>
 
         {state.status === "error" && state.message ? (

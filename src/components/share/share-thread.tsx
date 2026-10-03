@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-type ThreadComment = { id: string; body: string; authorEmail: string; createdAt: string };
+type ThreadComment = { id: string; body: string; authorName: string; createdAt: string };
 type Thread = { id: string; number: number; status: string; comments: ThreadComment[] };
 
 export function ShareThread({
@@ -55,7 +55,7 @@ export function ShareThread({
       <div className="flex flex-col gap-2">
         {thread.comments.map((comment) => (
           <div key={comment.id} className="text-sm">
-            <span className="font-medium">{comment.authorEmail}</span>
+            <span className="font-medium">{comment.authorName}</span>
             <span className="ml-2 text-xs text-muted-foreground">
               {new Date(comment.createdAt).toLocaleString()}
             </span>
