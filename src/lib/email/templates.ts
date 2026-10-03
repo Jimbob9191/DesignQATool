@@ -7,7 +7,7 @@
 
 export type EmailContent = { subject: string; html: string; text: string };
 
-const PRODUCT_NAME = "Design QA Tool";
+const PRODUCT_NAME = "DesignParity.app";
 
 export function escapeHtml(value: string): string {
   return value

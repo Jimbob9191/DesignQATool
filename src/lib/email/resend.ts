@@ -8,7 +8,7 @@ import { env } from "@/lib/env";
 // resend.dev is Resend's sandbox sender: it works without verifying a domain
 // but only delivers to the Resend account owner's own address. Set EMAIL_FROM
 // to an address on a domain verified in Resend for real delivery.
-const SANDBOX_FROM_ADDRESS = "Design QA Tool <onboarding@resend.dev>";
+const SANDBOX_FROM_ADDRESS = "DesignParity.app <onboarding@resend.dev>";
 
 let client: Resend | null = null;
 

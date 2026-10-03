@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Design QA Tool",
+  title: "DesignParity.app",
   description: "Compare Figma exports against the live built site, side by side.",
 };
 
