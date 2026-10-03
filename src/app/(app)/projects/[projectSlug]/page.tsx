@@ -42,13 +42,10 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const projectPages = await db
-    .select()
-    .from(pages)
-    .where(eq(pages.projectId, project.id))
-    .orderBy(asc(pages.name));
-
-  const pageStats = await getPageStatsForProject(project.id);
+  const [projectPages, pageStats] = await Promise.all([
+    db.select().from(pages).where(eq(pages.projectId, project.id)).orderBy(asc(pages.name)),
+    getPageStatsForProject(project.id),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">

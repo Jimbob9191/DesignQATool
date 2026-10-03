@@ -15,12 +15,18 @@ const ROLE_RANK: Record<TeamRole, number> = { viewer: 0, member: 1, admin: 2, ow
 
 export const CURRENT_TEAM_COOKIE = "current_team_id";
 
-export const getCurrentUser = cache(async () => {
+export type CurrentUser = { id: string; email: string | undefined };
+
+// getClaims() verifies the session JWT locally when the project uses
+// asymmetric signing keys (falling back to an Auth server round trip for
+// legacy symmetric secrets), so every page render isn't blocked on a network
+// call to Supabase Auth. Callers only need the user's id and email, both of
+// which are in the verified claims.
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+  const { data } = await supabase.auth.getClaims();
+  if (!data) return null;
+  return { id: data.claims.sub, email: data.claims.email };
 });
 
 export async function requireUser() {

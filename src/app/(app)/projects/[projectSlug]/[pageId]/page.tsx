@@ -34,40 +34,41 @@ export default async function PageDetailPage({
     notFound();
   }
 
-  const pageCaptures = await db
-    .select({ capture: captures, asset: assets })
-    .from(captures)
-    .innerJoin(assets, eq(captures.assetId, assets.id))
-    .where(eq(assets.pageId, pageId))
-    .orderBy(desc(captures.createdAt));
+  const [pageCaptures, designAssets, pageComparisons] = await Promise.all([
+    db
+      .select({ capture: captures, asset: assets })
+      .from(captures)
+      .innerJoin(assets, eq(captures.assetId, assets.id))
+      .where(eq(assets.pageId, pageId))
+      .orderBy(desc(captures.createdAt)),
+    db
+      .select()
+      .from(assets)
+      .where(and(eq(assets.pageId, pageId), eq(assets.kind, "design")))
+      .orderBy(desc(assets.createdAt)),
+    db
+      .select({ comparison: comparisons, designAsset: assets })
+      .from(comparisons)
+      .innerJoin(assets, eq(comparisons.designAssetId, assets.id))
+      .where(eq(comparisons.pageId, pageId))
+      .orderBy(desc(comparisons.createdAt)),
+  ]);
 
-  const designAssets = await db
-    .select()
-    .from(assets)
-    .where(and(eq(assets.pageId, pageId), eq(assets.kind, "design")))
-    .orderBy(desc(assets.createdAt));
-
-  const signedUrls = await getAssetSignedUrls([
-    ...pageCaptures.filter((c) => c.capture.status === "ready").map((c) => c.asset.storagePath),
-    ...designAssets.map((a) => a.storagePath),
+  const [signedUrls, comparisonThumbnailUrls] = await Promise.all([
+    getAssetSignedUrls([
+      ...pageCaptures.filter((c) => c.capture.status === "ready").map((c) => c.asset.storagePath),
+      ...designAssets.map((a) => a.storagePath),
+    ]),
+    getAssetSignedUrls(
+      pageComparisons.map(({ designAsset }) => designAsset.storagePath),
+      { thumbnail: true },
+    ),
   ]);
 
   const hasPendingCapture = pageCaptures.some((c) => c.capture.status === "pending");
   const defaultUrl = row.project.baseUrl
     ? new URL(row.page.path, row.project.baseUrl).toString()
     : "";
-
-  const pageComparisons = await db
-    .select({ comparison: comparisons, designAsset: assets })
-    .from(comparisons)
-    .innerJoin(assets, eq(comparisons.designAssetId, assets.id))
-    .where(eq(comparisons.pageId, pageId))
-    .orderBy(desc(comparisons.createdAt));
-
-  const comparisonThumbnailUrls = await getAssetSignedUrls(
-    pageComparisons.map(({ designAsset }) => designAsset.storagePath),
-    { thumbnail: true },
-  );
 
   const readyCaptures = pageCaptures.filter((c) => c.capture.status === "ready");
   const designOptions = designAssets.map((a) => ({

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { authUsers } from "drizzle-orm/supabase";
 import { ArrowLeft } from "lucide-react";
@@ -69,15 +69,58 @@ export default async function ComparisonDetailPage({
     notFound();
   }
 
-  const [captureRow] = await db
-    .select({ elementMap: captures.elementMap })
-    .from(captures)
-    .where(eq(captures.assetId, row.capture.id))
-    .limit(1);
+  // The row above is the team-scoped access check; everything below hangs off
+  // ids it has already validated, so it can all load in parallel.
+  const commentAuthor = alias(authUsers, "comment_author");
+  const [
+    [captureRow],
+    signedUrls,
+    [latestCapture],
+    annotationRows,
+    commentRows,
+    teamMemberRows,
+    shareLinkRows,
+  ] = await Promise.all([
+    db
+      .select({ elementMap: captures.elementMap })
+      .from(captures)
+      .where(eq(captures.assetId, row.capture.id))
+      .limit(1),
+    getAssetSignedUrls([row.design.storagePath, row.capture.storagePath], {
+      thumbnail: false,
+    }),
+    db
+      .select({ assetId: captures.assetId, capturedAt: captures.capturedAt })
+      .from(captures)
+      .innerJoin(assets, eq(captures.assetId, assets.id))
+      .where(and(eq(assets.pageId, pageId), eq(captures.status, "ready")))
+      .orderBy(desc(captures.createdAt))
+      .limit(1),
+    db
+      .select({ annotation: annotations, authorEmail: authUsers.email })
+      .from(annotations)
+      .innerJoin(authUsers, eq(annotations.createdBy, authUsers.id))
+      .where(eq(annotations.comparisonId, comparisonId))
+      .orderBy(asc(annotations.createdAt)),
+    db
+      .select({ comment: comments, authorEmail: commentAuthor.email })
+      .from(comments)
+      .innerJoin(annotations, eq(comments.annotationId, annotations.id))
+      .leftJoin(commentAuthor, eq(comments.createdBy, commentAuthor.id))
+      .where(eq(annotations.comparisonId, comparisonId))
+      .orderBy(asc(comments.createdAt)),
+    db
+      .select({ userId: teamMembers.userId, email: authUsers.email })
+      .from(teamMembers)
+      .innerJoin(authUsers, eq(teamMembers.userId, authUsers.id))
+      .where(eq(teamMembers.teamId, team.id)),
+    db
+      .select()
+      .from(shareLinks)
+      .where(eq(shareLinks.comparisonId, comparisonId))
+      .orderBy(desc(shareLinks.createdAt)),
+  ]);
 
-  const signedUrls = await getAssetSignedUrls([row.design.storagePath, row.capture.storagePath], {
-    thumbnail: false,
-  });
   const designUrl = signedUrls.get(row.design.storagePath);
   const captureUrl = signedUrls.get(row.capture.storagePath);
 
@@ -85,33 +128,7 @@ export default async function ComparisonDetailPage({
     notFound();
   }
 
-  const [latestCapture] = await db
-    .select({ assetId: captures.assetId, capturedAt: captures.capturedAt })
-    .from(captures)
-    .innerJoin(assets, eq(captures.assetId, assets.id))
-    .where(and(eq(assets.pageId, pageId), eq(captures.status, "ready")))
-    .orderBy(desc(captures.createdAt))
-    .limit(1);
   const hasNewerCapture = latestCapture && latestCapture.assetId !== row.capture.id;
-
-  const annotationRows = await db
-    .select({ annotation: annotations, authorEmail: authUsers.email })
-    .from(annotations)
-    .innerJoin(authUsers, eq(annotations.createdBy, authUsers.id))
-    .where(eq(annotations.comparisonId, comparisonId))
-    .orderBy(asc(annotations.createdAt));
-
-  const annotationIds = annotationRows.map((r) => r.annotation.id);
-  const commentAuthor = alias(authUsers, "comment_author");
-  const commentRows =
-    annotationIds.length === 0
-      ? []
-      : await db
-          .select({ comment: comments, authorEmail: commentAuthor.email })
-          .from(comments)
-          .leftJoin(commentAuthor, eq(comments.createdBy, commentAuthor.id))
-          .where(inArray(comments.annotationId, annotationIds))
-          .orderBy(asc(comments.createdAt));
 
   const initialAnnotations = annotationRows.map((r, index) => ({
     id: r.annotation.id,
@@ -134,18 +151,8 @@ export default async function ComparisonDetailPage({
       })),
   }));
 
-  const teamMemberRows = await db
-    .select({ userId: teamMembers.userId, email: authUsers.email })
-    .from(teamMembers)
-    .innerJoin(authUsers, eq(teamMembers.userId, authUsers.id))
-    .where(eq(teamMembers.teamId, team.id));
   const teamMemberOptions = teamMemberRows.map((m) => ({ id: m.userId, email: m.email ?? "unknown" }));
 
-  const shareLinkRows = await db
-    .select()
-    .from(shareLinks)
-    .where(eq(shareLinks.comparisonId, comparisonId))
-    .orderBy(desc(shareLinks.createdAt));
   const headersList = await headers();
   const host = headersList.get("host");
   const protocol =

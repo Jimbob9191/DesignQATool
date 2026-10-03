@@ -19,15 +19,6 @@ export default async function AssetsPage({
   const { team, role } = await getCurrentTeam();
   const canEdit = role !== "viewer";
 
-  const teamPages = await db
-    .select({ id: pages.id, name: pages.name, projectName: projects.name })
-    .from(pages)
-    .innerJoin(projects, eq(pages.projectId, projects.id))
-    .where(eq(projects.teamId, team.id))
-    .orderBy(projects.name, pages.name);
-
-  const pageOptions = teamPages.map((p) => ({ id: p.id, label: `${p.projectName} / ${p.name}` }));
-
   const conditions = [eq(assets.teamId, team.id)];
   if (pageFilter === "unassigned") {
     conditions.push(isNull(assets.pageId));
@@ -38,11 +29,21 @@ export default async function AssetsPage({
     conditions.push(eq(assets.kind, kindFilter));
   }
 
-  const teamAssets = await db
-    .select()
-    .from(assets)
-    .where(and(...conditions))
-    .orderBy(desc(assets.createdAt));
+  const [teamPages, teamAssets] = await Promise.all([
+    db
+      .select({ id: pages.id, name: pages.name, projectName: projects.name })
+      .from(pages)
+      .innerJoin(projects, eq(pages.projectId, projects.id))
+      .where(eq(projects.teamId, team.id))
+      .orderBy(projects.name, pages.name),
+    db
+      .select()
+      .from(assets)
+      .where(and(...conditions))
+      .orderBy(desc(assets.createdAt)),
+  ]);
+
+  const pageOptions = teamPages.map((p) => ({ id: p.id, label: `${p.projectName} / ${p.name}` }));
 
   const signedUrls = await getAssetSignedUrls(teamAssets.map((a) => a.storagePath));
 
