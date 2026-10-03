@@ -16,7 +16,7 @@ export default async function SignupPage({
         <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <ScanEye className="h-5 w-5" />
         </div>
-        <CardTitle>Create your Design QA account</CardTitle>
+        <CardTitle>Create your DesignParity.app account</CardTitle>
         <CardDescription>You&apos;ll get a personal team to start working in.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">

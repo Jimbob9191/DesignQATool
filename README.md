@@ -37,7 +37,7 @@ All email is sent by the app through [Resend](https://resend.com) (`src/lib/emai
 2. **Create an API key** — Resend dashboard → API Keys, with "Sending access" restricted to that domain.
 3. **Set the env vars** (see `.env.example`) locally and in your hosting provider:
    - `RESEND_API_KEY`
-   - `EMAIL_FROM` — e.g. `Design QA Tool <no-reply@mail.yourdomain.com>`; must be on the verified domain
+   - `EMAIL_FROM` — e.g. `DesignParity.app <no-reply@mail.yourdomain.com>`; must be on the verified domain
    - `EMAIL_REPLY_TO` (optional)
    - `NEXT_PUBLIC_SITE_URL` — the real public URL; every emailed link is built from it
 4. **Supabase → Authentication → Sign In / Providers → Email**: keep **Confirm email** enabled so unconfirmed accounts can't sign in with their password.
