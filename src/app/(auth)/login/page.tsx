@@ -16,7 +16,7 @@ export default async function LoginPage({
         <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <ScanEye className="h-5 w-5" />
         </div>
-        <CardTitle>Sign in to Design QA</CardTitle>
+        <CardTitle>Sign in to DesignParity.app</CardTitle>
         <CardDescription>Compare designs against the live site, side by side.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">

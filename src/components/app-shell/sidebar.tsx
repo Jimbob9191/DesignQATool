@@ -16,7 +16,7 @@ export function Sidebar({
       <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
           <ScanEye className="h-5 w-5" />
-          <span>Design QA</span>
+          <span>DesignParity.app</span>
         </Link>
       </div>
       <div className="border-b border-sidebar-border px-3 py-2">
