@@ -5,6 +5,7 @@ import { ScanEye } from "lucide-react";
 
 import { getAssetSignedUrl } from "@/lib/assets/signed-url";
 import { proxyOriginFor } from "@/lib/live/proxy";
+import { FORMER_MEMBER } from "@/lib/authors";
 import { db } from "@/lib/db";
 import { annotations, assets, comments, comparisons, pages, projects, shareLinks } from "@/lib/db/schema";
 import { LivePane } from "@/components/comparison/live-pane";
@@ -62,7 +63,6 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
   const annotationRows = await db
     .select({ annotation: annotations })
     .from(annotations)
-    .innerJoin(authUsers, eq(annotations.createdBy, authUsers.id))
     .where(eq(annotations.comparisonId, shareLink.comparisonId))
     .orderBy(asc(annotations.createdAt));
 
@@ -94,7 +94,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
           ? c.authorEmail.split("@")[0]
           : c.comment.guestName
             ? `${c.comment.guestName} (guest)`
-            : "Anonymous",
+            : FORMER_MEMBER,
         createdAt: c.comment.createdAt.toISOString(),
       })),
   }));

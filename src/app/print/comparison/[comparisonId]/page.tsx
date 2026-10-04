@@ -4,6 +4,7 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { authUsers } from "drizzle-orm/supabase";
 
 import { getAssetSignedUrl } from "@/lib/assets/signed-url";
+import { FORMER_MEMBER } from "@/lib/authors";
 import { db } from "@/lib/db";
 import { annotations, assets, comments, comparisons, pages, projects } from "@/lib/db/schema";
 import { verifyComparisonExportToken } from "@/lib/exports/sign";
@@ -58,7 +59,7 @@ export default async function PrintComparisonPage({
   const annotationRows = await db
     .select({ annotation: annotations, authorEmail: authUsers.email })
     .from(annotations)
-    .innerJoin(authUsers, eq(annotations.createdBy, authUsers.id))
+    .leftJoin(authUsers, eq(annotations.createdBy, authUsers.id))
     .where(eq(annotations.comparisonId, comparisonId))
     .orderBy(asc(annotations.createdAt));
 
@@ -83,7 +84,7 @@ export default async function PrintComparisonPage({
     comments: commentRows
       .filter((c) => c.comment.annotationId === r.annotation.id)
       .map((c) => ({
-        authorEmail: c.authorEmail ?? c.comment.guestName ?? "Anonymous",
+        authorEmail: c.authorEmail ?? c.comment.guestName ?? FORMER_MEMBER,
         body: c.comment.body,
       })),
   }));

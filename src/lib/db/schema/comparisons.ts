@@ -26,9 +26,9 @@ export const comparisons = pgTable(
     // whoever finds the proxy doesn't suit a site switches it for everyone.
     liveViaProxy: boolean("live_via_proxy").notNull().default(true),
     name: text("name").notNull(),
-    createdBy: uuid("created_by")
-      .notNull()
-      .references(() => authUsers.id, { onDelete: "cascade" }),
+    // Nullable and set null on delete so removing a user leaves the team's
+    // shared work in place, attributed to "Former member".
+    createdBy: uuid("created_by").references(() => authUsers.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

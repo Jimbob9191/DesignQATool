@@ -9,6 +9,7 @@ import { ArrowLeft } from "lucide-react";
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import type { ElementMapEntry } from "@/lib/annotations/hit-test";
 import { getCurrentUser, getCurrentTeam } from "@/lib/auth/team";
+import { FORMER_MEMBER } from "@/lib/authors";
 import { db } from "@/lib/db";
 import {
   annotations,
@@ -113,7 +114,7 @@ export default async function ComparisonDetailPage({
     db
       .select({ annotation: annotations, authorEmail: authUsers.email })
       .from(annotations)
-      .innerJoin(authUsers, eq(annotations.createdBy, authUsers.id))
+      .leftJoin(authUsers, eq(annotations.createdBy, authUsers.id))
       .where(eq(annotations.comparisonId, comparisonId))
       .orderBy(asc(annotations.createdAt)),
     db
@@ -152,7 +153,7 @@ export default async function ComparisonDetailPage({
     status: r.annotation.status,
     number: index + 1,
     authorId: r.annotation.createdBy,
-    authorEmail: r.authorEmail ?? "unknown",
+    authorEmail: r.authorEmail ?? FORMER_MEMBER,
     elementSelector: r.annotation.elementSelector,
     elementRect: r.annotation.elementRect as Rect | null,
     elementText: r.annotation.elementText,
@@ -163,7 +164,7 @@ export default async function ComparisonDetailPage({
         id: c.comment.id,
         body: c.comment.body,
         createdBy: c.comment.createdBy,
-        authorEmail: c.authorEmail ?? c.comment.guestName ?? "Anonymous",
+        authorEmail: c.authorEmail ?? c.comment.guestName ?? FORMER_MEMBER,
         createdAt: c.comment.createdAt.toISOString(),
         editedAt: c.comment.editedAt?.toISOString() ?? null,
       })),

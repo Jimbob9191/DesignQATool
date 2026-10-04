@@ -32,22 +32,6 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 
 ---
 
-### [ ] 2. 🗄️ Removing a user deletes everything they ever created in their teams
-**P1 · M · Touches:** `src/lib/db/schema/{assets,comparisons,annotations,comments,share-links,invitations}.ts`, new migration, `src/app/(app)/projects/[projectSlug]/[pageId]/compare/[comparisonId]/page.tsx`, `src/app/share/[token]/page.tsx`, `src/app/print/comparison/[comparisonId]/page.tsx`, `src/lib/dashboard/queries.ts`, `src/components/comparison/comparison-workspace.tsx`
-
-**Problem:** `created_by` / `invited_by` columns reference `auth.users` with `onDelete: "cascade"` (`assets.ts:40-42`, `comparisons.ts:31`, `annotations.ts:68`, `comments.ts:20`, `share-links.ts:25`, `invitations.ts:22`). When a user is deleted (from the Supabase dashboard today, or by the account deletion in task 13), every asset, comparison, pin and comment they made is deleted from **shared team data**, and further cascades follow (an asset → its comparisons → their pins).
-
-**Do:**
-- Make these columns nullable with `ON DELETE SET NULL`. Invitations can stay cascade if that's simpler; just note the decision in a comment. RLS policies that check `created_by = auth.uid()` on insert still work.
-- Several read paths `innerJoin(authUsers, …)` on `created_by`. Once authors can be null, those joins would hide rows. Switch them to `leftJoin` and fall back to a label like "Former member": compare page (~line 116), share page (~65), print page (~61), dashboard `getActivityFeed` (~170, ~188).
-- Update the TS types: `authorId` becomes `string | null` in the workspace and comment types.
-
-**Conflicts/depends:** do this before task 13 (account deletion). It shares `dashboard/queries.ts` with task 15.
-
-**Done when:** deleting a test user in a local Supabase leaves their team's content intact, attributed to "Former member".
-
----
-
 ### [ ] 3. Links into another team's content 404 (notification emails, team switching)
 **P1 · M · Touches:** `src/lib/auth/team.ts`, the detail pages under `src/app/(app)/projects/**`, `src/components/app-shell/team-switcher.tsx`
 
@@ -183,7 +167,7 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 ### [ ] 13. Account settings: change password and delete account
 **P2 · M · Touches:** `src/app/(app)/settings/page.tsx`, `src/lib/actions/auth.ts` (or a new `account.ts`), new settings components
 
-**Conflicts/depends:** requires task 2 first. Otherwise deleting an account destroys shared team content.
+**Conflicts/depends:** none. Task 2 (keep shared content when a user is deleted) is done: authored content survives as "Former member".
 
 **Problem:** Settings only has notification toggles. Changing your password means going through "forgot password", and there's no way to delete an account.
 
