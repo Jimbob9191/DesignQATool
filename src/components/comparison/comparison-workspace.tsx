@@ -67,6 +67,7 @@ export function ComparisonWorkspace({
   currentUser,
   teamMembers,
   canModerate = true,
+  initialSelectedId = null,
 }: {
   comparisonId: string;
   design: ComparisonImage;
@@ -76,9 +77,11 @@ export function ComparisonWorkspace({
   currentUser: { id: string; email: string };
   teamMembers: TeamMemberOption[];
   canModerate?: boolean;
+  // Pin to open on load, e.g. when arriving from a search result.
+  initialSelectedId?: string | null;
 }) {
   const [annotations, setAnnotations] = useState<WorkspaceAnnotation[]>(initialAnnotations);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [viaProxy, setViaProxy] = useState(live.kind === "site" && live.viaProxy);
 
   async function handleViaProxyChange(next: boolean) {

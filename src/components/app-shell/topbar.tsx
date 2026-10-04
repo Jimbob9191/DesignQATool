@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Menu, ScanEye, Search } from "lucide-react";
+import { Menu, ScanEye } from "lucide-react";
 
 import { NavLinks } from "@/components/app-shell/nav-links";
+import { GlobalSearch } from "@/components/search/global-search";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -17,14 +17,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { signOut } from "@/lib/actions/auth";
 
 export function Topbar({ userEmail }: { userEmail: string }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const router = useRouter();
   const initials = userEmail.slice(0, 2).toUpperCase();
 
   return (
@@ -50,24 +47,7 @@ export function Topbar({ userEmail }: { userEmail: string }) {
         </SheetContent>
       </Sheet>
 
-      <form
-        className="relative flex-1 max-w-sm"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (searchQuery.trim()) {
-            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-          }
-        }}
-      >
-        <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Search pages and comments…"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          className="pl-8"
-        />
-      </form>
+      <GlobalSearch />
 
       <ThemeToggle />
 
