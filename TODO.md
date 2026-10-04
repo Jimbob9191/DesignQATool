@@ -17,7 +17,7 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 
 ## P1 — bugs, data loss, security
 
-### [ ] 1. Deleting a design asset silently deletes every comparison that uses it
+### [x] 1. Deleting a design asset silently deletes every comparison that uses it
 **P1 · S–M · Touches:** `src/lib/actions/assets.ts`, `src/components/assets/asset-card.tsx`, `src/app/(app)/assets/page.tsx`, `src/app/(app)/projects/[projectSlug]/[pageId]/page.tsx`
 
 **Problem:** `comparisons.design_asset_id` is `ON DELETE CASCADE` (`src/lib/db/schema/comparisons.ts:17`). Deleting an asset therefore wipes every comparison built on it, along with all of their pins and comments. The confirm dialog says it only removes "any pins referencing it" (`asset-card.tsx:110`). `deleteAsset` also removes the storage object *before* the DB row (`assets.ts:128-130`): if the DB delete fails, the row is left pointing at a missing file.

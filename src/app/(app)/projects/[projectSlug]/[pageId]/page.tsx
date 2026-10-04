@@ -5,6 +5,7 @@ import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
 import { AlertCircle, Clock, GitCompare } from "lucide-react";
 
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
+import { getAssetComparisonNames } from "@/lib/assets/usage";
 import { getCurrentTeam } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { assets, captures, comparisons, pages, projects } from "@/lib/db/schema";
@@ -65,7 +66,7 @@ export default async function PageDetailPage({
       .orderBy(desc(comparisons.createdAt)),
   ]);
 
-  const [signedUrls, comparisonThumbnailUrls] = await Promise.all([
+  const [signedUrls, comparisonThumbnailUrls, comparisonNames] = await Promise.all([
     getAssetSignedUrls([
       ...pageCaptures.filter((c) => c.capture.status === "ready").map((c) => c.asset.storagePath),
       ...designAssets.map((a) => a.storagePath),
@@ -74,6 +75,7 @@ export default async function PageDetailPage({
       pageComparisons.map(({ designAsset }) => designAsset.storagePath),
       { thumbnail: true },
     ),
+    getAssetComparisonNames(designAssets.map((a) => a.id)),
   ]);
 
   const defaultUrl = row.project.baseUrl
@@ -141,6 +143,7 @@ export default async function PageDetailPage({
                     height: asset.height,
                     pageId: asset.pageId,
                     signedUrl: signedUrls.get(asset.storagePath) ?? null,
+                    comparisonNames: comparisonNames.get(asset.id) ?? [],
                   }}
                   pageOptions={[{ id: pageId, label: row.page.name }]}
                   canEdit={canEdit}

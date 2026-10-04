@@ -2,6 +2,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { getCurrentTeam } from "@/lib/auth/team";
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
+import { getAssetComparisonNames } from "@/lib/assets/usage";
 import { db } from "@/lib/db";
 import { assets, pages, projects } from "@/lib/db/schema";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,7 +46,10 @@ export default async function AssetsPage({
 
   const pageOptions = teamPages.map((p) => ({ id: p.id, label: `${p.projectName} / ${p.name}` }));
 
-  const signedUrls = await getAssetSignedUrls(teamAssets.map((a) => a.storagePath));
+  const [signedUrls, comparisonNames] = await Promise.all([
+    getAssetSignedUrls(teamAssets.map((a) => a.storagePath)),
+    getAssetComparisonNames(teamAssets.map((a) => a.id)),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -83,6 +87,7 @@ export default async function AssetsPage({
                 height: asset.height,
                 pageId: asset.pageId,
                 signedUrl: signedUrls.get(asset.storagePath) ?? null,
+                comparisonNames: comparisonNames.get(asset.id) ?? [],
               }}
               pageOptions={pageOptions}
               canEdit={canEdit}

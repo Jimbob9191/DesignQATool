@@ -25,9 +25,32 @@ export type AssetCardData = {
   height: number | null;
   pageId: string | null;
   signedUrl: string | null;
+  // Comparisons built on this asset, which deleting it deletes too.
+  comparisonNames: string[];
 };
 
 export type PageOption = { id: string; label: string };
+
+const NAMED_COMPARISONS_LIMIT = 3;
+
+function deleteDescription(comparisonNames: string[]): string {
+  const base = "This permanently deletes the file.";
+  const count = comparisonNames.length;
+  if (count === 0) {
+    return `${base} No comparisons use it. This can't be undone.`;
+  }
+
+  const quoted = comparisonNames.slice(0, NAMED_COMPARISONS_LIMIT).map((name) => `"${name}"`);
+  const rest = count - quoted.length;
+  const list =
+    rest > 0
+      ? `${quoted.join(", ")} and ${rest} more`
+      : quoted.length > 1
+        ? `${quoted.slice(0, -1).join(", ")} and ${quoted.at(-1)}`
+        : quoted[0];
+  const noun = count === 1 ? "comparison" : "comparisons";
+  return `${base} It's used by ${count} ${noun} (${list}), which will be deleted too, along with all of their pins and comments. This can't be undone.`;
+}
 
 export function AssetCard({
   asset,
@@ -107,9 +130,11 @@ export function AssetCard({
               </Button>
             }
             title={`Delete "${filename}"?`}
-            description="This permanently removes the file from storage and any pins referencing it. This can't be undone."
+            description={deleteDescription(asset.comparisonNames)}
             onConfirm={async () => {
-              await deleteAsset(asset.id);
+              const result = await deleteAsset(asset.id);
+              // Thrown errors are shown by the dialog, which stays open.
+              if (!result.success) throw new Error(result.error);
               toast.success("Asset deleted");
               router.refresh();
             }}
