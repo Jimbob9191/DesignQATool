@@ -17,6 +17,8 @@ export type AnnotationThread = {
   target: "design" | "live";
   status: AnnotationStatus;
   authorEmail: string;
+  /** Extra context, e.g. the pinned element's text on a live site. */
+  detail?: string | null;
   comments: CommentData[];
 };
 
@@ -132,6 +134,11 @@ export function CommentSidebar({
                     </Button>
                   ) : null}
                 </div>
+                {thread.detail ? (
+                  <p className="mt-1 truncate pl-[3.125rem] text-xs text-muted-foreground" title={thread.detail}>
+                    {thread.detail}
+                  </p>
+                ) : null}
 
                 {!isCollapsed ? (
                   <div className="mt-3 flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>

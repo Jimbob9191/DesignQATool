@@ -14,6 +14,10 @@ type RawAnnotationRow = {
   x_ratio: string;
   y_px: number;
   status: "open" | "resolved" | "wont_fix" | "needs_review";
+  element_selector: string | null;
+  element_rect: { x: number; y: number; width: number; height: number } | null;
+  element_text: string | null;
+  page_url: string | null;
   created_by: string;
 };
 

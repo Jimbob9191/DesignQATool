@@ -30,14 +30,20 @@ export const annotationStatusEnum = pgEnum("annotation_status", [
 // by re-resolving the selector and reapplying the same relative offset
 // within its new bounding box. x_ratio/y_px alone are the fallback used
 // when there's no selector (design-pane pins) or it fails to re-resolve.
-// The caller can edit the comparison, and asset_id is one of that team's assets.
+// For pins on a live comparison's site there is no image: asset_id is null,
+// x_ratio/y_px are in the page's document space at the comparison's
+// viewport width, page_url says which page of the site the pin is on, and
+// element_text lets the bridge find the element again if its selector
+// stops matching.
+// The caller can edit the comparison, and asset_id (if any) is one of that team's assets.
 function editableWithTeamAsset(table: { comparisonId: AnyPgColumn; assetId: AnyPgColumn }) {
   return sql`exists (
         select 1 from comparisons
         join pages on pages.id = comparisons.page_id
         join projects on projects.id = pages.project_id
         where comparisons.id = ${table.comparisonId} and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')
-          and exists (select 1 from assets where assets.id = ${table.assetId} and assets.team_id = projects.team_id)
+          and (${table.assetId} is null
+            or exists (select 1 from assets where assets.id = ${table.assetId} and assets.team_id = projects.team_id))
       )`;
 }
 
@@ -49,13 +55,13 @@ export const annotations = pgTable(
       .notNull()
       .references(() => comparisons.id, { onDelete: "cascade" }),
     target: annotationTargetEnum("target").notNull(),
-    assetId: uuid("asset_id")
-      .notNull()
-      .references(() => assets.id, { onDelete: "cascade" }),
+    assetId: uuid("asset_id").references(() => assets.id, { onDelete: "cascade" }),
     xRatio: numeric("x_ratio", { precision: 12, scale: 8 }).notNull(),
     yPx: integer("y_px").notNull(),
     elementSelector: text("element_selector"),
     elementRect: jsonb("element_rect"),
+    elementText: text("element_text"),
+    pageUrl: text("page_url"),
     status: annotationStatusEnum("status").notNull().default("open"),
     createdBy: uuid("created_by")
       .notNull()

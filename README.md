@@ -45,9 +45,31 @@ All email is sent by the app through [Resend](https://resend.com) (`src/lib/emai
 
 Without `RESEND_API_KEY`, nothing is sent; in development the would-be email, including its link, is printed to the `next dev` console so signup and reset can still be completed locally.
 
-## Capture service
+## Live site comparisons
 
-Live-site screenshots and PDF exports come from `capture-service/`, a small Fastify + Playwright (Chromium) server. The app calls it with `CAPTURE_SERVICE_URL` and authenticates with a shared bearer token, `CAPTURE_SERVICE_SECRET`; without them, captures fail with "Capture service is not configured."
+A comparison puts a design upload next to the real site, framed live in the reviewer's browser at the viewport width the design was made for. Scrolling either side scrolls both, and Overlay/Swipe lay the design over the running site. Pins go on real page elements — stored by selector, element text and position within the element — so they follow the element as the page changes; one that can't be found is drawn dashed where it last was.
+
+The page talks to the app through `public/bridge.js` (protocol: `src/lib/live/protocol.ts`), which gets onto the page one of two ways — switchable per comparison from the viewer, for the whole team:
+
+- **Preview proxy (default, no setup).** `live-proxy/` serves the site from its own subdomain, `<label>.LIVE_PROXY_DOMAIN`, where the label is the site's host plus a signature (`src/lib/live/proxy-label.ts`) so only sites someone set up a comparison for can be proxied. Paths stay identical, so client-side routers keep working. It drops the headers that block framing, adds the bridge and a small runtime to every page (keeping links, API calls and "back to our own domain" redirects on the proxy), rewrites the site's absolute URLs, and only lets the app frame its pages. Sites needing a sign-in, or that detect proxies, may not work — the viewer offers a switch to Direct.
+- **Direct (needs the snippet).** The site is framed as-is and must include `<script src="https://www.designparity.app/bridge.js" async></script>` (staging or localhost is fine) and allow being framed (no `X-Frame-Options: DENY` / restrictive CSP `frame-ancestors`). From the https app only https sites, or `http://localhost`, can be framed. The snippet does nothing unless the page is framed by the app origin it was loaded from.
+
+Comparisons made from screenshots before this still open in the old image viewer.
+
+### The preview proxy
+
+It's a Cloudflare Worker (`live-proxy/src/worker.ts`) on a domain of its own — **not** a subdomain of the app's, since proxied sites run their own scripts there. Setup:
+
+1. Register a domain for it on Cloudflare (e.g. via Cloudflare Registrar) and add a proxied (orange-cloud) wildcard DNS record `*` pointing anywhere (e.g. `AAAA 100::`).
+2. Put the domain into `live-proxy/wrangler.toml` (`PROXY_DOMAIN`, the route and its zone).
+3. `cd live-proxy && npx wrangler secret put PROXY_SECRET` and `npx wrangler deploy`.
+4. In Vercel set `LIVE_PROXY_DOMAIN` (the domain) and `LIVE_PROXY_SECRET` (same value as `PROXY_SECRET`), then redeploy.
+
+Without those two variables the app only offers Direct. Locally, `live-proxy/src/dev-server.ts` runs the same handler over plain http on `*.proxy.localhost:8788` (browsers resolve any `*.localhost` to this machine): set `LIVE_PROXY_DOMAIN=proxy.localhost:8788` and a `LIVE_PROXY_SECRET` in `.env.local` and start the Conductor "proxy" run script, or `cd live-proxy && APP_ORIGINS=http://localhost:3000 node --env-file=../.env.local src/dev-server.ts`.
+
+## PDF export service
+
+PDF exports come from `capture-service/`, a small Fastify + Playwright (Chromium) server (it also still has the old screenshot `/capture` endpoint, which the app no longer calls). The app calls it with `CAPTURE_SERVICE_URL` and authenticates with a shared bearer token, `CAPTURE_SERVICE_SECRET`; without them, export fails with "Export is not configured."
 
 It runs on **Google Cloud Run** (project `designparity-capture`, region `us-east4`), scaled to zero when idle so normal usage stays inside the free tier. A £1/month budget alert on the project emails the billing owner if that ever changes. To redeploy after changing it:
 
@@ -56,7 +78,7 @@ cd capture-service
 gcloud run deploy capture-service --source . --project designparity-capture --region us-east4
 ```
 
-Settings (2 vCPU, 2 GiB, concurrency 2, 90s timeout, 0–3 instances) and the secret persist between deploys. A full-page capture of a heavy page takes ~15–30s there, against the service's 60s capture limit.
+Settings (2 vCPU, 2 GiB, concurrency 2, 90s timeout, 0–3 instances) and the secret persist between deploys.
 
 Locally: `cd capture-service && npm install && npx playwright install chromium`, put `CAPTURE_SERVICE_SECRET=<anything>` in `capture-service/.env.local`, run `npm run dev` (port 8787), and point the app's `.env.local` at `CAPTURE_SERVICE_URL=http://localhost:8787` with the same secret.
 

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { createAnnotation, updateAnnotationPosition, updateAnnotationStatus } from "@/lib/actions/annotations";
 import { createComment } from "@/lib/actions/comments";
+import { setComparisonViaProxy } from "@/lib/actions/comparisons";
 import type { ElementMapEntry } from "@/lib/annotations/hit-test";
 import { useComparisonRealtime } from "@/lib/realtime/use-comparison-realtime";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -16,7 +17,10 @@ import {
   ComparisonViewer,
   type ComparisonImage,
 } from "@/components/comparison/comparison-viewer";
+import { LiveComparisonViewer } from "@/components/comparison/live-comparison-viewer";
+import type { LivePick } from "@/components/comparison/live-pane";
 import type { AnnotationStatus } from "@/components/comparison/pin-marker";
+import { samePage, type Rect } from "@/lib/live/protocol";
 
 type WorkspaceAnnotation = {
   id: string;
@@ -27,34 +31,64 @@ type WorkspaceAnnotation = {
   number: number;
   authorId: string;
   authorEmail: string;
+  elementSelector: string | null;
+  elementRect: Rect | null;
+  elementText: string | null;
+  pageUrl: string | null;
   comments: CommentData[];
 };
+
+/**
+ * What the design is compared against: a screenshot taken by the old
+ * capture service, or the site itself framed live at a viewport width.
+ */
+export type WorkspaceLiveSide =
+  | {
+      kind: "capture";
+      image: ComparisonImage;
+      captureAssetId: string;
+      elementMap: ElementMapEntry[];
+    }
+  | {
+      kind: "site";
+      url: string;
+      viewportWidth: number;
+      snippet: string;
+      proxyOrigin: string | null;
+      viaProxy: boolean;
+    };
 
 export function ComparisonWorkspace({
   comparisonId,
   design,
   live,
   designAssetId,
-  captureAssetId,
   initialAnnotations,
-  elementMap,
   currentUser,
   teamMembers,
   canModerate = true,
 }: {
   comparisonId: string;
   design: ComparisonImage;
-  live: ComparisonImage;
+  live: WorkspaceLiveSide;
   designAssetId: string;
-  captureAssetId: string;
   initialAnnotations: WorkspaceAnnotation[];
-  elementMap: ElementMapEntry[];
   currentUser: { id: string; email: string };
   teamMembers: TeamMemberOption[];
   canModerate?: boolean;
 }) {
   const [annotations, setAnnotations] = useState<WorkspaceAnnotation[]>(initialAnnotations);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [viaProxy, setViaProxy] = useState(live.kind === "site" && live.viaProxy);
+
+  async function handleViaProxyChange(next: boolean) {
+    setViaProxy(next);
+    const result = await setComparisonViaProxy(comparisonId, next);
+    if (!result.success) {
+      toast.error(result.error);
+      setViaProxy(!next);
+    }
+  }
 
   useEffect(() => {
     setAnnotations(initialAnnotations);
@@ -81,6 +115,10 @@ export function ComparisonWorkspace({
               number: nextNumber,
               authorId: row.created_by,
               authorEmail: "teammate",
+              elementSelector: row.element_selector,
+              elementRect: row.element_rect,
+              elementText: row.element_text,
+              pageUrl: row.page_url,
               comments: [],
             },
           ];
@@ -90,7 +128,14 @@ export function ComparisonWorkspace({
         setAnnotations((prev) =>
           prev.map((a) =>
             a.id === row.id
-              ? { ...a, xRatio: Number(row.x_ratio), yPx: row.y_px, status: row.status }
+              ? {
+                  ...a,
+                  xRatio: Number(row.x_ratio),
+                  yPx: row.y_px,
+                  status: row.status,
+                  elementSelector: row.element_selector,
+                  elementRect: row.element_rect,
+                }
               : a
           )
         );
@@ -147,24 +192,20 @@ export function ComparisonWorkspace({
     },
   });
 
-  async function handleCreate(
-    target: "design" | "live",
-    point: { x: number; y: number },
-    hit: { selector: string; rect: ElementMapEntry["rect"] } | null
-  ) {
-    const image = target === "design" ? design : live;
-    const xRatio = point.x / image.width;
-    const yPx = point.y;
+  type NewAnnotation = Pick<
+    WorkspaceAnnotation,
+    "target" | "xRatio" | "yPx" | "elementSelector" | "elementRect" | "elementText" | "pageUrl"
+  > & { assetId: string | null };
 
+  async function addAnnotation(input: NewAnnotation) {
     const nextNumber = annotations.length > 0 ? Math.max(...annotations.map((a) => a.number)) + 1 : 1;
     const tempId = `pending-${Date.now()}`;
+    const { assetId, ...fields } = input;
     setAnnotations((prev) => [
       ...prev,
       {
+        ...fields,
         id: tempId,
-        target,
-        xRatio,
-        yPx,
         status: "open",
         number: nextNumber,
         authorId: currentUser.id,
@@ -174,15 +215,7 @@ export function ComparisonWorkspace({
     ]);
     setSelectedId(tempId);
 
-    const result = await createAnnotation({
-      comparisonId,
-      target,
-      assetId: target === "design" ? designAssetId : captureAssetId,
-      xRatio,
-      yPx,
-      elementSelector: hit?.selector ?? null,
-      elementRect: hit?.rect ?? null,
-    });
+    const result = await createAnnotation({ ...fields, comparisonId, assetId });
 
     if (!result.success) {
       toast.error(result.error);
@@ -193,6 +226,37 @@ export function ComparisonWorkspace({
 
     setAnnotations((prev) => prev.map((a) => (a.id === tempId ? { ...a, id: result.data.id } : a)));
     setSelectedId(result.data.id);
+  }
+
+  function handleCreate(
+    target: "design" | "live",
+    point: { x: number; y: number },
+    hit: { selector: string; rect: ElementMapEntry["rect"] } | null
+  ) {
+    const image = target === "design" || live.kind !== "capture" ? design : live.image;
+    void addAnnotation({
+      target,
+      assetId: target === "design" ? designAssetId : live.kind === "capture" ? live.captureAssetId : null,
+      xRatio: point.x / image.width,
+      yPx: point.y,
+      elementSelector: hit?.selector ?? null,
+      elementRect: hit?.rect ?? null,
+      elementText: null,
+      pageUrl: null,
+    });
+  }
+
+  function handleCreateLive(pick: LivePick, viewportWidth: number) {
+    void addAnnotation({
+      target: "live",
+      assetId: null,
+      xRatio: Math.min(1, Math.max(0, pick.docPoint.x / viewportWidth)),
+      yPx: Math.max(0, pick.docPoint.y),
+      elementSelector: pick.element.selector || null,
+      elementRect: pick.element.docRect,
+      elementText: pick.element.text || null,
+      pageUrl: pick.url,
+    });
   }
 
   async function handleDrag(id: string, next: { xRatio: number; yPx: number }) {
@@ -276,6 +340,7 @@ export function ComparisonWorkspace({
       target: a.target,
       status: a.status,
       authorEmail: a.authorEmail,
+      detail: live.kind === "site" ? livePinDetail(a, live.url) : null,
       comments: a.comments,
     }));
 
@@ -305,16 +370,37 @@ export function ComparisonWorkspace({
 
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
-          <ComparisonViewer
-            design={design}
-            live={live}
-            annotations={annotations}
-            selectedAnnotationId={selectedId}
-            onSelectAnnotation={setSelectedId}
-            onCreateAnnotation={handleCreate}
-            onDragAnnotation={canModerate ? handleDrag : undefined}
-            elementMap={elementMap}
-          />
+          {live.kind === "capture" ? (
+            <ComparisonViewer
+              design={design}
+              live={live.image}
+              annotations={annotations}
+              selectedAnnotationId={selectedId}
+              onSelectAnnotation={setSelectedId}
+              onCreateAnnotation={handleCreate}
+              onDragAnnotation={canModerate ? handleDrag : undefined}
+              elementMap={live.elementMap}
+            />
+          ) : (
+            <LiveComparisonViewer
+              design={design}
+              site={{
+                url: live.url,
+                viewportWidth: live.viewportWidth,
+                label: "Live",
+                proxyOrigin: live.proxyOrigin,
+                viaProxy,
+              }}
+              snippet={live.snippet}
+              annotations={annotations}
+              selectedAnnotationId={selectedId}
+              onSelectAnnotation={setSelectedId}
+              onCreateDesignAnnotation={(point) => handleCreate("design", point, null)}
+              onCreateLiveAnnotation={(pick) => handleCreateLive(pick, live.viewportWidth)}
+              onDragAnnotation={canModerate ? handleDrag : undefined}
+              onViaProxyChange={canModerate ? handleViaProxyChange : undefined}
+            />
+          )}
         </div>
         <CommentSidebar
           threads={threads}
@@ -330,4 +416,20 @@ export function ComparisonWorkspace({
       </div>
     </div>
   );
+}
+
+/** Sidebar hint for a live-site pin: the element's text, and its page if not the comparison's own. */
+function livePinDetail(annotation: WorkspaceAnnotation, comparisonUrl: string): string | null {
+  if (annotation.target !== "live") return null;
+  const parts: string[] = [];
+  if (annotation.elementText) parts.push(`“${annotation.elementText}”`);
+  if (annotation.pageUrl && !samePage(annotation.pageUrl, comparisonUrl)) {
+    try {
+      const url = new URL(annotation.pageUrl);
+      parts.push(`on ${url.pathname}${url.search}`);
+    } catch {
+      parts.push(`on ${annotation.pageUrl}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(" ") : null;
 }

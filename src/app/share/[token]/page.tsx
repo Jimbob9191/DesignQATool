@@ -4,8 +4,10 @@ import { authUsers } from "drizzle-orm/supabase";
 import { ScanEye } from "lucide-react";
 
 import { getAssetSignedUrl } from "@/lib/assets/signed-url";
+import { proxyOriginFor } from "@/lib/live/proxy";
 import { db } from "@/lib/db";
 import { annotations, assets, comments, comparisons, pages, projects, shareLinks } from "@/lib/db/schema";
+import { LivePane } from "@/components/comparison/live-pane";
 import { ShareThread } from "@/components/share/share-thread";
 
 export default async function SharePage({ params }: { params: Promise<{ token: string }> }) {
@@ -34,7 +36,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
     .innerJoin(pages, eq(comparisons.pageId, pages.id))
     .innerJoin(projects, eq(pages.projectId, projects.id))
     .innerJoin(designAssets, eq(comparisons.designAssetId, designAssets.id))
-    .innerJoin(captureAssets, eq(comparisons.captureAssetId, captureAssets.id))
+    .leftJoin(captureAssets, eq(comparisons.captureAssetId, captureAssets.id))
     .where(eq(comparisons.id, shareLink.comparisonId))
     .limit(1);
 
@@ -44,8 +46,18 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
 
   const [designUrl, captureUrl] = await Promise.all([
     getAssetSignedUrl(row.design.storagePath),
-    getAssetSignedUrl(row.capture.storagePath),
+    row.capture ? getAssetSignedUrl(row.capture.storagePath) : null,
   ]);
+
+  // Guests get the site the same way the team does.
+  let liveFrameUrl = row.comparison.liveUrl;
+  if (liveFrameUrl && row.comparison.liveViaProxy) {
+    const proxyOrigin = await proxyOriginFor(liveFrameUrl);
+    if (proxyOrigin) {
+      const url = new URL(liveFrameUrl);
+      liveFrameUrl = proxyOrigin + url.pathname + url.search + url.hash;
+    }
+  }
 
   const annotationRows = await db
     .select({ annotation: annotations })
@@ -114,6 +126,15 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
           {captureUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URL
             <img src={captureUrl} alt="Live" className="w-full rounded-md border border-border" />
+          ) : liveFrameUrl && row.comparison.viewportWidth ? (
+            <div className="h-[70vh] overflow-hidden rounded-md border border-border">
+              <LivePane
+                src={liveFrameUrl}
+                viewportWidth={row.comparison.viewportWidth}
+                mode="browse"
+                pins={[]}
+              />
+            </div>
           ) : null}
         </div>
       </div>

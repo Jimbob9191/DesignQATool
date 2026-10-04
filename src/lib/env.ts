@@ -7,6 +7,11 @@ export const env = createEnv({
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
     CAPTURE_SERVICE_URL: z.string().url().optional(),
     CAPTURE_SERVICE_SECRET: z.string().min(1).optional(),
+    // Live-preview proxy (live-proxy/): the domain sites are served from as
+    // <label>.LIVE_PROXY_DOMAIN, and the secret labels are signed with. Unset
+    // means comparisons can only frame sites directly, via the snippet.
+    LIVE_PROXY_DOMAIN: z.string().min(1).optional(),
+    LIVE_PROXY_SECRET: z.string().min(16).optional(),
     RESEND_API_KEY: z.string().min(1).optional(),
     // "Name <address>" on a domain verified in Resend. Unset falls back to
     // Resend's sandbox sender, which only delivers to the account owner.

@@ -1,0 +1,1 @@
+ALTER TABLE "comparisons" ADD COLUMN "live_via_proxy" boolean DEFAULT true NOT NULL;
