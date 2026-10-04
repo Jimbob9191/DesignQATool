@@ -22,6 +22,11 @@ export type UsePanZoomOptions = {
   onChange: (next: PanZoomState) => void;
   /** disable wheel/pointer handling (e.g. while a modal is open) */
   disabled?: boolean;
+  /**
+   * Wheel scrolls (pans) instead of zooming; pinch or ctrl/cmd+wheel still
+   * zooms. Used beside a live site, where the wheel scrolls the page.
+   */
+  wheelPans?: boolean;
 };
 
 export type UsePanZoomResult = {
@@ -31,6 +36,7 @@ export type UsePanZoomResult = {
   panBy: (dx: number, dy: number) => void;
   reset: () => void;
   fitToContainer: (imageWidth: number, imageHeight: number) => void;
+  fitToWidth: (imageWidth: number) => void;
   isPanning: boolean;
 };
 
@@ -45,6 +51,7 @@ export function usePanZoom({
   state,
   onChange,
   disabled,
+  wheelPans,
 }: UsePanZoomOptions): UsePanZoomResult {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -105,12 +112,26 @@ export function usePanZoom({
     [containerRef, onChange]
   );
 
+  const fitToWidth = useCallback(
+    (imageWidth: number) => {
+      const container = containerRef.current;
+      if (!container || imageWidth <= 0) return;
+      const scale = clampScale(container.getBoundingClientRect().width / imageWidth);
+      onChange({ scale, tx: 0, ty: 0 });
+    },
+    [containerRef, onChange]
+  );
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container || disabled) return;
 
     function handleWheel(e: WheelEvent) {
       e.preventDefault();
+      if (wheelPans && !e.ctrlKey && !e.metaKey) {
+        panBy(-e.deltaX, -e.deltaY);
+        return;
+      }
       const rect = container!.getBoundingClientRect();
       const factor = Math.exp(-e.deltaY * 0.0015);
       zoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
@@ -163,7 +184,7 @@ export function usePanZoom({
       container.removeEventListener("pointermove", handlePointerMove);
       container.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [containerRef, disabled, zoomAt, panBy]);
+  }, [containerRef, disabled, wheelPans, zoomAt, panBy]);
 
   return {
     screenToImage,
@@ -172,6 +193,7 @@ export function usePanZoom({
     panBy,
     reset,
     fitToContainer,
+    fitToWidth,
     isPanning: isPanningRef.current,
   };
 }

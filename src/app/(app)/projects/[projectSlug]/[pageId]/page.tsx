@@ -1,17 +1,21 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { and, desc, eq } from "drizzle-orm";
-import { AlertCircle, Clock, GitCompare, ImageOff } from "lucide-react";
+import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
+import { AlertCircle, Clock, GitCompare } from "lucide-react";
 
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import { getCurrentTeam } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { assets, captures, comparisons, pages, projects } from "@/lib/db/schema";
+import { env } from "@/lib/env";
+import { bridgeSnippet } from "@/lib/live/protocol";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AssetCard } from "@/components/assets/asset-card";
-import { CapturePanel } from "@/components/captures/capture-panel";
+import { UploadDropzone } from "@/components/assets/upload-dropzone";
+import { BridgeSnippet } from "@/components/comparisons/bridge-snippet";
 import { CreateComparisonDialog } from "@/components/comparisons/create-comparison-dialog";
 
 export default async function PageDetailPage({
@@ -34,7 +38,7 @@ export default async function PageDetailPage({
     notFound();
   }
 
-  const [pageCaptures, designAssets, pageComparisons] = await Promise.all([
+  const [pageCaptures, designAssets, otherDesigns, pageComparisons] = await Promise.all([
     db
       .select({ capture: captures, asset: assets })
       .from(captures)
@@ -45,6 +49,13 @@ export default async function PageDetailPage({
       .select()
       .from(assets)
       .where(and(eq(assets.pageId, pageId), eq(assets.kind, "design")))
+      .orderBy(desc(assets.createdAt)),
+    // The rest of the team's designs can be compared here too.
+    db
+      .select({ id: assets.id, storagePath: assets.storagePath, width: assets.width, pageName: pages.name })
+      .from(assets)
+      .leftJoin(pages, eq(assets.pageId, pages.id))
+      .where(and(eq(assets.teamId, team.id), eq(assets.kind, "design"), or(isNull(assets.pageId), ne(assets.pageId, pageId))))
       .orderBy(desc(assets.createdAt)),
     db
       .select({ comparison: comparisons, designAsset: assets })
@@ -65,20 +76,31 @@ export default async function PageDetailPage({
     ),
   ]);
 
-  const hasPendingCapture = pageCaptures.some((c) => c.capture.status === "pending");
   const defaultUrl = row.project.baseUrl
     ? new URL(row.page.path, row.project.baseUrl).toString()
     : "";
 
-  const readyCaptures = pageCaptures.filter((c) => c.capture.status === "ready");
-  const designOptions = designAssets.map((a) => ({
-    id: a.id,
-    label: a.storagePath.split("/").pop() ?? a.id,
-  }));
-  const captureOptions = readyCaptures.map(({ capture, asset }) => ({
-    id: asset.id,
-    label: `${capture.viewportWidth}px — ${(capture.capturedAt ?? capture.createdAt).toLocaleString()}`,
-  }));
+  const designOptions = [
+    ...designAssets.map((a) => ({
+      id: a.id,
+      label: a.storagePath.split("/").pop() ?? a.id,
+      width: a.width,
+      note: null,
+    })),
+    ...otherDesigns.map((a) => ({
+      id: a.id,
+      label: a.storagePath.split("/").pop() ?? a.id,
+      width: a.width,
+      note: a.pageName ? `from ${a.pageName}` : "not on a page yet",
+    })),
+  ];
+
+  const headersList = await headers();
+  const host = headersList.get("host");
+  const protocol =
+    headersList.get("x-forwarded-proto") ??
+    (host?.startsWith("localhost") || host?.startsWith("127.0.0.1") ? "http" : "https");
+  const snippet = bridgeSnippet(host ? `${protocol}://${host}` : env.NEXT_PUBLIC_SITE_URL);
 
   return (
     <div className="flex flex-col gap-6">
@@ -89,33 +111,117 @@ export default async function PageDetailPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Capture the live site</CardTitle>
+          <CardTitle>Sites that need the snippet</CardTitle>
         </CardHeader>
-        <CardContent>
-          {canEdit ? (
-            <CapturePanel
-              pageId={pageId}
-              defaultUrl={defaultUrl}
-              hasPendingCapture={hasPendingCapture}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Viewers can&rsquo;t run captures on this page.
-            </p>
-          )}
+        <CardContent className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Comparisons load the live site through a preview proxy, with nothing to install. If a
+            site doesn&rsquo;t work that way (it needs a sign-in, or blocks proxies), switch the
+            comparison to Direct and add this snippet to the site — staging or localhost is fine.
+            It does nothing unless the page is opened inside DesignParity.app.
+          </p>
+          <BridgeSnippet snippet={snippet} />
         </CardContent>
       </Card>
 
       <div>
-        <h2 className="mb-3 text-lg font-medium">Capture history</h2>
-        {pageCaptures.length === 0 ? (
+        <h2 className="mb-3 text-lg font-medium">Designs</h2>
+        <div className="flex flex-col gap-4">
+          {canEdit ? <UploadDropzone defaultPageId={pageId} /> : null}
+          {designAssets.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {designAssets.map((asset) => (
+                <AssetCard
+                  key={asset.id}
+                  asset={{
+                    id: asset.id,
+                    kind: asset.kind,
+                    storagePath: asset.storagePath,
+                    width: asset.width,
+                    height: asset.height,
+                    pageId: asset.pageId,
+                    signedUrl: signedUrls.get(asset.storagePath) ?? null,
+                  }}
+                  pageOptions={[{ id: pageId, label: row.page.name }]}
+                  canEdit={canEdit}
+                />
+              ))}
+            </div>
+          ) : !canEdit ? (
+            <p className="text-sm text-muted-foreground">No designs on this page yet.</p>
+          ) : null}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-medium">Comparisons</h2>
+          {canEdit ? (
+            <CreateComparisonDialog
+              projectSlug={projectSlug}
+              pageId={pageId}
+              designOptions={designOptions}
+              defaultUrl={defaultUrl}
+              trigger={
+                <Button variant="outline" size="sm">
+                  <GitCompare className="h-4 w-4" />
+                  New comparison
+                </Button>
+              }
+            />
+          ) : null}
+        </div>
+        {pageComparisons.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-              <ImageOff className="h-6 w-6 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">No captures yet.</p>
+              <GitCompare className="h-6 w-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                {designOptions.length === 0
+                  ? "Upload a design above, then compare it with the live site."
+                  : "No comparisons yet."}
+              </p>
             </CardContent>
           </Card>
         ) : (
+          <div className="flex flex-col gap-2">
+            {pageComparisons.map(({ comparison, designAsset }) => (
+              <Link
+                key={comparison.id}
+                href={`/projects/${projectSlug}/${pageId}/compare/${comparison.id}`}
+                className="flex items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted"
+              >
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                  {comparisonThumbnailUrls.get(designAsset.storagePath) ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URLs
+                    <img
+                      src={comparisonThumbnailUrls.get(designAsset.storagePath)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <GitCompare className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex flex-1 items-center justify-between">
+                  <span className="font-medium">{comparison.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {comparison.createdAt.toLocaleString()}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {pageCaptures.length > 0 ? (
+        <div>
+          <h2 className="mb-1 text-lg font-medium">Earlier captures</h2>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Screenshots from before comparisons showed the live site. Comparisons made from them
+            still open.
+          </p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {pageCaptures.map(({ capture, asset }) => (
               <Card key={capture.id} className="overflow-hidden py-0">
@@ -165,98 +271,9 @@ export default async function PageDetailPage({
               </Card>
             ))}
           </div>
-        )}
-      </div>
-
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-medium">Comparisons</h2>
-          {canEdit ? (
-            <CreateComparisonDialog
-              projectSlug={projectSlug}
-              pageId={pageId}
-              designOptions={designOptions}
-              captureOptions={captureOptions}
-              trigger={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={designOptions.length === 0 || captureOptions.length === 0}
-                >
-                  <GitCompare className="h-4 w-4" />
-                  New comparison
-                </Button>
-              }
-            />
-          ) : null}
-        </div>
-        {pageComparisons.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-              <GitCompare className="h-6 w-6 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                {designOptions.length === 0 || captureOptions.length === 0
-                  ? "Upload a design and capture the live site to create a comparison."
-                  : "No comparisons yet."}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {pageComparisons.map(({ comparison, designAsset }) => (
-              <Link
-                key={comparison.id}
-                href={`/projects/${projectSlug}/${pageId}/compare/${comparison.id}`}
-                className="flex items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted"
-              >
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
-                  {comparisonThumbnailUrls.get(designAsset.storagePath) ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URLs
-                    <img
-                      src={comparisonThumbnailUrls.get(designAsset.storagePath)}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <GitCompare className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </div>
-                <div className="flex flex-1 items-center justify-between">
-                  <span className="font-medium">{comparison.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {comparison.createdAt.toLocaleString()}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {designAssets.length > 0 ? (
-        <div>
-          <h2 className="mb-3 text-lg font-medium">Design assets</h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {designAssets.map((asset) => (
-              <AssetCard
-                key={asset.id}
-                asset={{
-                  id: asset.id,
-                  kind: asset.kind,
-                  storagePath: asset.storagePath,
-                  width: asset.width,
-                  height: asset.height,
-                  pageId: asset.pageId,
-                  signedUrl: signedUrls.get(asset.storagePath) ?? null,
-                }}
-                pageOptions={[{ id: pageId, label: row.page.name }]}
-                canEdit={canEdit}
-              />
-            ))}
-          </div>
         </div>
       ) : null}
+
     </div>
   );
 }

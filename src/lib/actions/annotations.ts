@@ -22,11 +22,14 @@ const rectSchema = z.object({
 const createAnnotationSchema = z.object({
   comparisonId: z.uuid(),
   target: z.enum(["design", "live"]),
-  assetId: z.uuid(),
+  // null for a pin on a live comparison's site, which has no image
+  assetId: z.uuid().nullable(),
   xRatio: z.number().min(0).max(1),
   yPx: z.number().min(0),
-  elementSelector: z.string().nullable().optional(),
+  elementSelector: z.string().max(2000).nullable().optional(),
   elementRect: rectSchema.nullable().optional(),
+  elementText: z.string().max(200).nullable().optional(),
+  pageUrl: z.url({ protocol: /^https?$/ }).max(2000).nullable().optional(),
 });
 
 async function assertComparisonInTeam(comparisonId: string, teamId: string) {
@@ -63,12 +66,16 @@ export async function createAnnotation(
     return { success: false, error: "Comparison not found." };
   }
 
-  // A pin sits on one of this comparison's two images, never an arbitrary
-  // asset id from the client.
+  // A pin sits on one of this comparison's images, never an arbitrary asset
+  // id from the client — or, on a live comparison, on the site itself.
   const expectedAssetId =
     parsed.data.target === "design" ? comparison.designAssetId : comparison.captureAssetId;
   if (parsed.data.assetId !== expectedAssetId) {
     return { success: false, error: "That image isn't part of this comparison." };
+  }
+  const isSitePin = parsed.data.target === "live" && !comparison.captureAssetId;
+  if (isSitePin && !parsed.data.pageUrl) {
+    return { success: false, error: "Missing the page this pin is on." };
   }
 
   const [annotation] = await db
@@ -81,6 +88,8 @@ export async function createAnnotation(
       yPx: Math.round(parsed.data.yPx),
       elementSelector: parsed.data.elementSelector ?? null,
       elementRect: parsed.data.elementRect ?? null,
+      elementText: isSitePin ? (parsed.data.elementText ?? null) : null,
+      pageUrl: isSitePin ? (parsed.data.pageUrl ?? null) : null,
       createdBy: user.id,
     })
     .returning({ id: annotations.id });
@@ -199,6 +208,9 @@ export async function refreshComparisonCapture(
 
   const comparison = await assertComparisonInTeam(comparisonId, team.id);
   if (!comparison) return { success: false, error: "Comparison not found." };
+  if (!comparison.captureAssetId) {
+    return { success: false, error: "This comparison shows the live site, not a capture." };
+  }
 
   const [captureRow] = await db
     .select({ elementMap: captures.elementMap, width: assets.width })

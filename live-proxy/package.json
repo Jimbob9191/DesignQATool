@@ -1,0 +1,11 @@
+{
+  "name": "live-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env.local src/dev-server.ts",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

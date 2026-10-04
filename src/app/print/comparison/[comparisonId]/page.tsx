@@ -38,7 +38,7 @@ export default async function PrintComparisonPage({
     .innerJoin(pages, eq(comparisons.pageId, pages.id))
     .innerJoin(projects, eq(pages.projectId, projects.id))
     .innerJoin(designAssets, eq(comparisons.designAssetId, designAssets.id))
-    .innerJoin(captureAssets, eq(comparisons.captureAssetId, captureAssets.id))
+    .leftJoin(captureAssets, eq(comparisons.captureAssetId, captureAssets.id))
     .where(eq(comparisons.id, comparisonId))
     .limit(1);
 
@@ -48,10 +48,10 @@ export default async function PrintComparisonPage({
 
   const [designUrl, captureUrl] = await Promise.all([
     getAssetSignedUrl(row.design.storagePath),
-    getAssetSignedUrl(row.capture.storagePath),
+    row.capture ? getAssetSignedUrl(row.capture.storagePath) : null,
   ]);
 
-  if (!designUrl || !captureUrl) {
+  if (!designUrl || (row.capture && !captureUrl)) {
     notFound();
   }
 
@@ -77,6 +77,9 @@ export default async function PrintComparisonPage({
   const issues = annotationRows.map((r, index) => ({
     number: index + 1,
     status: r.annotation.status,
+    target: r.annotation.target,
+    elementText: r.annotation.elementText,
+    pageUrl: r.annotation.pageUrl,
     comments: commentRows
       .filter((c) => c.comment.annotationId === r.annotation.id)
       .map((c) => ({
@@ -119,12 +122,19 @@ export default async function PrintComparisonPage({
         </div>
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: 12, fontWeight: "bold", marginBottom: 6 }}>Live</p>
-          {/* eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URL fetched by Playwright, not the app UI */}
-          <img
-            src={captureUrl}
-            alt="Live"
-            style={{ width: "100%", height: "auto", border: "1px solid #ddd" }}
-          />
+          {captureUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URL fetched by Playwright, not the app UI
+            <img
+              src={captureUrl}
+              alt="Live"
+              style={{ width: "100%", height: "auto", border: "1px solid #ddd" }}
+            />
+          ) : (
+            <p style={{ fontSize: 13, color: "#555", marginTop: 0, wordBreak: "break-all" }}>
+              Reviewed on the live site at {row.comparison.viewportWidth}px wide:{" "}
+              {row.comparison.liveUrl}
+            </p>
+          )}
         </div>
       </div>
 
@@ -145,6 +155,13 @@ export default async function PrintComparisonPage({
                   ({issue.status.replace("_", " ")})
                 </span>
               </p>
+              {issue.target === "live" && (issue.elementText || issue.pageUrl) ? (
+                <p style={{ fontSize: 12, color: "#555", marginTop: 4, marginBottom: 0, wordBreak: "break-all" }}>
+                  {issue.elementText ? `“${issue.elementText}”` : null}
+                  {issue.elementText && issue.pageUrl ? " on " : null}
+                  {issue.pageUrl}
+                </p>
+              ) : null}
               {issue.comments.length === 0 ? (
                 <p style={{ fontSize: 13, color: "#777", marginTop: 4 }}>No comments.</p>
               ) : (

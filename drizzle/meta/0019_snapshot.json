@@ -1,0 +1,1595 @@
+{
+  "id": "7b8ac2d4-de45-4083-a67d-32c5a5263d33",
+  "prevId": "cb3494dd-e927-40af-9849-09c7aafc7c92",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.teams": {
+      "name": "teams",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "teams_slug_unique": {
+          "name": "teams_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {
+        "teams_select_member": {
+          "name": "teams_select_member",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "public.current_team_role(\"teams\".\"id\") is not null"
+        },
+        "teams_insert_authenticated": {
+          "name": "teams_insert_authenticated",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "true"
+        },
+        "teams_update_owner_admin": {
+          "name": "teams_update_owner_admin",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "public.current_team_role(\"teams\".\"id\") in ('owner', 'admin')"
+        },
+        "teams_delete_owner": {
+          "name": "teams_delete_owner",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "public.current_team_role(\"teams\".\"id\") = 'owner'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.team_members": {
+      "name": "team_members",
+      "schema": "",
+      "columns": {
+        "team_id": {
+          "name": "team_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "team_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'member'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "team_members_team_id_teams_id_fk": {
+          "name": "team_members_team_id_teams_id_fk",
+          "tableFrom": "team_members",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "team_members_user_id_users_id_fk": {
+          "name": "team_members_user_id_users_id_fk",
+          "tableFrom": "team_members",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "team_members_team_id_user_id_pk": {
+          "name": "team_members_team_id_user_id_pk",
+          "columns": [
+            "team_id",
+            "user_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "team_members_select_same_team": {
+          "name": "team_members_select_same_team",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "public.current_team_role(\"team_members\".\"team_id\") is not null"
+        },
+        "team_members_insert_bootstrap_or_admin": {
+          "name": "team_members_insert_bootstrap_or_admin",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "(\n        \"team_members\".\"user_id\" = auth.uid()\n        and public.team_member_count(\"team_members\".\"team_id\") = 0\n      ) or (\n        public.current_team_role(\"team_members\".\"team_id\") = 'owner'\n        or (public.current_team_role(\"team_members\".\"team_id\") = 'admin' and \"team_members\".\"role\" <> 'owner')\n      )"
+        },
+        "team_members_update_owner_admin": {
+          "name": "team_members_update_owner_admin",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "(\n        public.current_team_role(\"team_members\".\"team_id\") = 'owner'\n        or (public.current_team_role(\"team_members\".\"team_id\") = 'admin' and \"team_members\".\"role\" <> 'owner')\n      )",
+          "withCheck": "(\n        public.current_team_role(\"team_members\".\"team_id\") = 'owner'\n        or (public.current_team_role(\"team_members\".\"team_id\") = 'admin' and \"team_members\".\"role\" <> 'owner')\n      )"
+        },
+        "team_members_delete_owner_admin_or_self": {
+          "name": "team_members_delete_owner_admin_or_self",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "(\"team_members\".\"user_id\" = auth.uid() and \"team_members\".\"role\" <> 'owner') or (\n        public.current_team_role(\"team_members\".\"team_id\") = 'owner'\n        or (public.current_team_role(\"team_members\".\"team_id\") = 'admin' and \"team_members\".\"role\" <> 'owner')\n      )"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.invitations": {
+      "name": "invitations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "team_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'member'"
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "invitation_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "invited_by": {
+          "name": "invited_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "invitations_team_id_teams_id_fk": {
+          "name": "invitations_team_id_teams_id_fk",
+          "tableFrom": "invitations",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "invitations_invited_by_users_id_fk": {
+          "name": "invitations_invited_by_users_id_fk",
+          "tableFrom": "invitations",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "invited_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "invitations_token_unique": {
+          "name": "invitations_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {
+        "invitations_select_owner_admin": {
+          "name": "invitations_select_owner_admin",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "public.current_team_role(\"invitations\".\"team_id\") in ('owner', 'admin')"
+        },
+        "invitations_insert_owner_admin": {
+          "name": "invitations_insert_owner_admin",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "public.current_team_role(\"invitations\".\"team_id\") in ('owner', 'admin')\n        and \"invitations\".\"role\" <> 'owner'\n        and \"invitations\".\"invited_by\" = auth.uid()"
+        },
+        "invitations_delete_owner_admin": {
+          "name": "invitations_delete_owner_admin",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "public.current_team_role(\"invitations\".\"team_id\") in ('owner', 'admin')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.projects": {
+      "name": "projects",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_url": {
+          "name": "base_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "projects_team_id_slug_unique": {
+          "name": "projects_team_id_slug_unique",
+          "columns": [
+            {
+              "expression": "team_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "projects_team_id_teams_id_fk": {
+          "name": "projects_team_id_teams_id_fk",
+          "tableFrom": "projects",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "projects_select_team_member": {
+          "name": "projects_select_team_member",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "public.current_team_role(\"projects\".\"team_id\") is not null"
+        },
+        "projects_insert_non_viewer": {
+          "name": "projects_insert_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "public.current_team_role(\"projects\".\"team_id\") in ('owner', 'admin', 'member')"
+        },
+        "projects_update_non_viewer": {
+          "name": "projects_update_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "public.current_team_role(\"projects\".\"team_id\") in ('owner', 'admin', 'member')"
+        },
+        "projects_delete_owner_admin": {
+          "name": "projects_delete_owner_admin",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "public.current_team_role(\"projects\".\"team_id\") in ('owner', 'admin')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.pages": {
+      "name": "pages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "path": {
+          "name": "path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pages_project_id_projects_id_fk": {
+          "name": "pages_project_id_projects_id_fk",
+          "tableFrom": "pages",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "pages_select_team_member": {
+          "name": "pages_select_team_member",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from projects\n        where projects.id = \"pages\".\"project_id\" and public.current_team_role(projects.team_id) is not null\n      )"
+        },
+        "pages_insert_non_viewer": {
+          "name": "pages_insert_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "exists (\n        select 1 from projects\n        where projects.id = \"pages\".\"project_id\" and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')\n      )"
+        },
+        "pages_update_non_viewer": {
+          "name": "pages_update_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from projects\n        where projects.id = \"pages\".\"project_id\" and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')\n      )"
+        },
+        "pages_delete_non_viewer": {
+          "name": "pages_delete_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from projects\n        where projects.id = \"pages\".\"project_id\" and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')\n      )"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.assets": {
+      "name": "assets",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "page_id": {
+          "name": "page_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "asset_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "storage_path": {
+          "name": "storage_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mime": {
+          "name": "mime",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "assets_team_id_teams_id_fk": {
+          "name": "assets_team_id_teams_id_fk",
+          "tableFrom": "assets",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "assets_page_id_pages_id_fk": {
+          "name": "assets_page_id_pages_id_fk",
+          "tableFrom": "assets",
+          "tableTo": "pages",
+          "columnsFrom": [
+            "page_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "assets_created_by_users_id_fk": {
+          "name": "assets_created_by_users_id_fk",
+          "tableFrom": "assets",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "assets_select_team_member": {
+          "name": "assets_select_team_member",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "public.current_team_role(\"assets\".\"team_id\") is not null"
+        },
+        "assets_insert_non_viewer": {
+          "name": "assets_insert_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "public.current_team_role(\"assets\".\"team_id\") in ('owner', 'admin', 'member')\n        and split_part(\"assets\".\"storage_path\", '/', 1) = \"assets\".\"team_id\"::text\n        and \"assets\".\"storage_path\" not like '%..%'\n        and \"assets\".\"created_by\" = auth.uid()"
+        },
+        "assets_update_non_viewer": {
+          "name": "assets_update_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "public.current_team_role(\"assets\".\"team_id\") in ('owner', 'admin', 'member')",
+          "withCheck": "public.current_team_role(\"assets\".\"team_id\") in ('owner', 'admin', 'member')\n        and split_part(\"assets\".\"storage_path\", '/', 1) = \"assets\".\"team_id\"::text\n        and \"assets\".\"storage_path\" not like '%..%'"
+        },
+        "assets_delete_non_viewer": {
+          "name": "assets_delete_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "public.current_team_role(\"assets\".\"team_id\") in ('owner', 'admin', 'member')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.captures": {
+      "name": "captures",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "asset_id": {
+          "name": "asset_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "viewport_width": {
+          "name": "viewport_width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_scale_factor": {
+          "name": "device_scale_factor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "element_map": {
+          "name": "element_map",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "captured_at": {
+          "name": "captured_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "capture_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "captures_asset_id_assets_id_fk": {
+          "name": "captures_asset_id_assets_id_fk",
+          "tableFrom": "captures",
+          "tableTo": "assets",
+          "columnsFrom": [
+            "asset_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "captures_select_team_member": {
+          "name": "captures_select_team_member",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from assets\n        where assets.id = \"captures\".\"asset_id\" and public.current_team_role(assets.team_id) is not null\n      )"
+        },
+        "captures_insert_non_viewer": {
+          "name": "captures_insert_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "exists (\n        select 1 from assets\n        where assets.id = \"captures\".\"asset_id\" and public.current_team_role(assets.team_id) in ('owner', 'admin', 'member')\n      )"
+        },
+        "captures_update_non_viewer": {
+          "name": "captures_update_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from assets\n        where assets.id = \"captures\".\"asset_id\" and public.current_team_role(assets.team_id) in ('owner', 'admin', 'member')\n      )"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.comparisons": {
+      "name": "comparisons",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "page_id": {
+          "name": "page_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "design_asset_id": {
+          "name": "design_asset_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "capture_asset_id": {
+          "name": "capture_asset_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "live_url": {
+          "name": "live_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "viewport_width": {
+          "name": "viewport_width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "comparisons_page_id_pages_id_fk": {
+          "name": "comparisons_page_id_pages_id_fk",
+          "tableFrom": "comparisons",
+          "tableTo": "pages",
+          "columnsFrom": [
+            "page_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "comparisons_design_asset_id_assets_id_fk": {
+          "name": "comparisons_design_asset_id_assets_id_fk",
+          "tableFrom": "comparisons",
+          "tableTo": "assets",
+          "columnsFrom": [
+            "design_asset_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "comparisons_capture_asset_id_assets_id_fk": {
+          "name": "comparisons_capture_asset_id_assets_id_fk",
+          "tableFrom": "comparisons",
+          "tableTo": "assets",
+          "columnsFrom": [
+            "capture_asset_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "comparisons_created_by_users_id_fk": {
+          "name": "comparisons_created_by_users_id_fk",
+          "tableFrom": "comparisons",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "comparisons_select_team_member": {
+          "name": "comparisons_select_team_member",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from pages join projects on projects.id = pages.project_id\n        where pages.id = \"comparisons\".\"page_id\" and public.current_team_role(projects.team_id) is not null\n      )"
+        },
+        "comparisons_insert_non_viewer": {
+          "name": "comparisons_insert_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "\"comparisons\".\"created_by\" = auth.uid() and exists (\n        select 1 from pages join projects on projects.id = pages.project_id\n        where pages.id = \"comparisons\".\"page_id\" and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')\n          and exists (select 1 from assets where assets.id = \"comparisons\".\"design_asset_id\" and assets.team_id = projects.team_id)\n          and (\"comparisons\".\"capture_asset_id\" is null\n            or exists (select 1 from assets where assets.id = \"comparisons\".\"capture_asset_id\" and assets.team_id = projects.team_id))\n      )"
+        },
+        "comparisons_delete_non_viewer": {
+          "name": "comparisons_delete_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from pages join projects on projects.id = pages.project_id\n        where pages.id = \"comparisons\".\"page_id\" and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')\n      )"
+        }
+      },
+      "checkConstraints": {
+        "comparisons_capture_or_live": {
+          "name": "comparisons_capture_or_live",
+          "value": "\"comparisons\".\"capture_asset_id\" is not null or (\"comparisons\".\"live_url\" is not null and \"comparisons\".\"viewport_width\" is not null)"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.annotations": {
+      "name": "annotations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "comparison_id": {
+          "name": "comparison_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target": {
+          "name": "target",
+          "type": "annotation_target",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asset_id": {
+          "name": "asset_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "x_ratio": {
+          "name": "x_ratio",
+          "type": "numeric(12, 8)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "y_px": {
+          "name": "y_px",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "element_selector": {
+          "name": "element_selector",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "element_rect": {
+          "name": "element_rect",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "element_text": {
+          "name": "element_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "page_url": {
+          "name": "page_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "annotation_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "annotations_comparison_id_comparisons_id_fk": {
+          "name": "annotations_comparison_id_comparisons_id_fk",
+          "tableFrom": "annotations",
+          "tableTo": "comparisons",
+          "columnsFrom": [
+            "comparison_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "annotations_asset_id_assets_id_fk": {
+          "name": "annotations_asset_id_assets_id_fk",
+          "tableFrom": "annotations",
+          "tableTo": "assets",
+          "columnsFrom": [
+            "asset_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "annotations_created_by_users_id_fk": {
+          "name": "annotations_created_by_users_id_fk",
+          "tableFrom": "annotations",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "annotations_select_team_member": {
+          "name": "annotations_select_team_member",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from comparisons\n        join pages on pages.id = comparisons.page_id\n        join projects on projects.id = pages.project_id\n        where comparisons.id = \"annotations\".\"comparison_id\" and public.current_team_role(projects.team_id) is not null\n      )"
+        },
+        "annotations_insert_non_viewer": {
+          "name": "annotations_insert_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "\"annotations\".\"created_by\" = auth.uid() and exists (\n        select 1 from comparisons\n        join pages on pages.id = comparisons.page_id\n        join projects on projects.id = pages.project_id\n        where comparisons.id = \"annotations\".\"comparison_id\" and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')\n          and (\"annotations\".\"asset_id\" is null\n            or exists (select 1 from assets where assets.id = \"annotations\".\"asset_id\" and assets.team_id = projects.team_id))\n      )"
+        },
+        "annotations_update_non_viewer": {
+          "name": "annotations_update_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from comparisons\n        join pages on pages.id = comparisons.page_id\n        join projects on projects.id = pages.project_id\n        where comparisons.id = \"annotations\".\"comparison_id\" and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')\n      )",
+          "withCheck": "exists (\n        select 1 from comparisons\n        join pages on pages.id = comparisons.page_id\n        join projects on projects.id = pages.project_id\n        where comparisons.id = \"annotations\".\"comparison_id\" and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')\n          and (\"annotations\".\"asset_id\" is null\n            or exists (select 1 from assets where assets.id = \"annotations\".\"asset_id\" and assets.team_id = projects.team_id))\n      )"
+        },
+        "annotations_delete_non_viewer": {
+          "name": "annotations_delete_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from comparisons\n        join pages on pages.id = comparisons.page_id\n        join projects on projects.id = pages.project_id\n        where comparisons.id = \"annotations\".\"comparison_id\" and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')\n      )"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.comments": {
+      "name": "comments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "annotation_id": {
+          "name": "annotation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "guest_name": {
+          "name": "guest_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "edited_at": {
+          "name": "edited_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "comments_annotation_id_annotations_id_fk": {
+          "name": "comments_annotation_id_annotations_id_fk",
+          "tableFrom": "comments",
+          "tableTo": "annotations",
+          "columnsFrom": [
+            "annotation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "comments_created_by_users_id_fk": {
+          "name": "comments_created_by_users_id_fk",
+          "tableFrom": "comments",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "comments_select_team_member": {
+          "name": "comments_select_team_member",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from annotations\n        join comparisons on comparisons.id = annotations.comparison_id\n        join pages on pages.id = comparisons.page_id\n        join projects on projects.id = pages.project_id\n        where annotations.id = \"comments\".\"annotation_id\" and public.current_team_role(projects.team_id) is not null\n      )"
+        },
+        "comments_insert_non_viewer": {
+          "name": "comments_insert_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "\"comments\".\"created_by\" = auth.uid() and exists (\n        select 1 from annotations\n        join comparisons on comparisons.id = annotations.comparison_id\n        join pages on pages.id = comparisons.page_id\n        join projects on projects.id = pages.project_id\n        where annotations.id = \"comments\".\"annotation_id\" and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')\n      )"
+        },
+        "comments_update_own": {
+          "name": "comments_update_own",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"comments\".\"created_by\" = auth.uid()",
+          "withCheck": "\"comments\".\"created_by\" = auth.uid() and exists (\n        select 1 from annotations\n        join comparisons on comparisons.id = annotations.comparison_id\n        join pages on pages.id = comparisons.page_id\n        join projects on projects.id = pages.project_id\n        where annotations.id = \"comments\".\"annotation_id\" and public.current_team_role(projects.team_id) is not null\n      )"
+        },
+        "comments_delete_own": {
+          "name": "comments_delete_own",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"comments\".\"created_by\" = auth.uid()"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.share_links": {
+      "name": "share_links",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "comparison_id": {
+          "name": "comparison_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "allow_anonymous_comments": {
+          "name": "allow_anonymous_comments",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "share_links_comparison_id_comparisons_id_fk": {
+          "name": "share_links_comparison_id_comparisons_id_fk",
+          "tableFrom": "share_links",
+          "tableTo": "comparisons",
+          "columnsFrom": [
+            "comparison_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "share_links_created_by_users_id_fk": {
+          "name": "share_links_created_by_users_id_fk",
+          "tableFrom": "share_links",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "share_links_token_unique": {
+          "name": "share_links_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {
+        "share_links_select_team_member": {
+          "name": "share_links_select_team_member",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from comparisons\n        join pages on pages.id = comparisons.page_id\n        join projects on projects.id = pages.project_id\n        where comparisons.id = \"share_links\".\"comparison_id\" and public.current_team_role(projects.team_id) is not null\n      )"
+        },
+        "share_links_insert_non_viewer": {
+          "name": "share_links_insert_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "\"share_links\".\"created_by\" = auth.uid() and exists (\n        select 1 from comparisons\n        join pages on pages.id = comparisons.page_id\n        join projects on projects.id = pages.project_id\n        where comparisons.id = \"share_links\".\"comparison_id\" and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')\n      )"
+        },
+        "share_links_delete_non_viewer": {
+          "name": "share_links_delete_non_viewer",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "exists (\n        select 1 from comparisons\n        join pages on pages.id = comparisons.page_id\n        join projects on projects.id = pages.project_id\n        where comparisons.id = \"share_links\".\"comparison_id\" and public.current_team_role(projects.team_id) in ('owner', 'admin', 'member')\n      )"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.user_preferences": {
+      "name": "user_preferences",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "notify_on_mention": {
+          "name": "notify_on_mention",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "notify_on_reply": {
+          "name": "notify_on_reply",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_preferences_user_id_users_id_fk": {
+          "name": "user_preferences_user_id_users_id_fk",
+          "tableFrom": "user_preferences",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "user_preferences_select_own": {
+          "name": "user_preferences_select_own",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"user_preferences\".\"user_id\" = auth.uid()"
+        },
+        "user_preferences_insert_own": {
+          "name": "user_preferences_insert_own",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "authenticated"
+          ],
+          "withCheck": "\"user_preferences\".\"user_id\" = auth.uid()"
+        },
+        "user_preferences_update_own": {
+          "name": "user_preferences_update_own",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "authenticated"
+          ],
+          "using": "\"user_preferences\".\"user_id\" = auth.uid()"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.rate_limits": {
+      "name": "rate_limits",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "window_started_at": {
+          "name": "window_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    }
+  },
+  "enums": {
+    "public.team_role": {
+      "name": "team_role",
+      "schema": "public",
+      "values": [
+        "owner",
+        "admin",
+        "member",
+        "viewer"
+      ]
+    },
+    "public.invitation_status": {
+      "name": "invitation_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "accepted",
+        "revoked"
+      ]
+    },
+    "public.asset_kind": {
+      "name": "asset_kind",
+      "schema": "public",
+      "values": [
+        "design",
+        "capture"
+      ]
+    },
+    "public.capture_status": {
+      "name": "capture_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "ready",
+        "error"
+      ]
+    },
+    "public.annotation_status": {
+      "name": "annotation_status",
+      "schema": "public",
+      "values": [
+        "open",
+        "resolved",
+        "wont_fix",
+        "needs_review"
+      ]
+    },
+    "public.annotation_target": {
+      "name": "annotation_target",
+      "schema": "public",
+      "values": [
+        "design",
+        "live"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

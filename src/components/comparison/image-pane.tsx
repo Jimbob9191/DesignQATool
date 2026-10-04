@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 export type ImagePaneHandle = {
   fitToContainer: () => void;
+  fitToWidth: () => void;
   reset: () => void;
   zoomAt: (screenX: number, screenY: number, factor: number) => void;
 };
@@ -31,6 +32,7 @@ export function ImagePane({
   onImageClick,
   onImageHover,
   overlay,
+  wheelPans,
   className,
 }: {
   src: string;
@@ -47,23 +49,27 @@ export function ImagePane({
   onImageHover?: (point: { x: number; y: number } | null) => void;
   /** Renders pins/highlights in an unscaled screen-space layer above the image. */
   overlay?: (transform: PaneTransform) => React.ReactNode;
+  /** Wheel scrolls rather than zooms — see usePanZoom. */
+  wheelPans?: boolean;
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { fitToContainer, reset, zoomAt, imageToScreen, screenToImage } = usePanZoom({
+  const { fitToContainer, fitToWidth, reset, zoomAt, imageToScreen, screenToImage } = usePanZoom({
     containerRef,
     state,
     onChange,
+    wheelPans,
   });
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     handleRef?.({
       fitToContainer: () => fitToContainer(imageWidth, imageHeight),
+      fitToWidth: () => fitToWidth(imageWidth),
       reset,
       zoomAt,
     });
-  }, [handleRef, fitToContainer, reset, zoomAt, imageWidth, imageHeight]);
+  }, [handleRef, fitToContainer, fitToWidth, reset, zoomAt, imageWidth, imageHeight]);
 
   return (
     <div

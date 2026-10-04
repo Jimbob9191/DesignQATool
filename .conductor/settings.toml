@@ -10,3 +10,7 @@ command = "NEXT_PUBLIC_SITE_URL=http://localhost:$CONDUCTOR_PORT npm run dev -- 
 default = true
 icon = "play"
 
+[scripts.run.proxy]
+available_in = [ "local" ]
+command = "cd live-proxy && APP_ORIGINS=http://localhost:$CONDUCTOR_PORT node --env-file=../.env.local src/dev-server.ts"
+icon = "globe"

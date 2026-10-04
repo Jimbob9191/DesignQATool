@@ -1,0 +1,14 @@
+# Cloudflare Worker serving every proxied site from <label>.PROXY_DOMAIN.
+# PROXY_DOMAIN must be its own registrable domain (not a subdomain of the
+# app's), with a proxied wildcard DNS record "*" so the route below matches.
+# Set the shared secret with: npx wrangler secret put PROXY_SECRET
+name = "designparity-live-proxy"
+main = "src/worker.ts"
+compatibility_date = "2026-09-01"
+workers_dev = false
+
+routes = [{ pattern = "*.REPLACE_WITH_PROXY_DOMAIN/*", zone_name = "REPLACE_WITH_PROXY_DOMAIN" }]
+
+[vars]
+PROXY_DOMAIN = "REPLACE_WITH_PROXY_DOMAIN"
+APP_ORIGINS = "https://www.designparity.app"

@@ -38,6 +38,7 @@
   ],
   "exclude": [
     "node_modules",
-    "capture-service"
+    "capture-service",
+    "live-proxy"
   ]
 }

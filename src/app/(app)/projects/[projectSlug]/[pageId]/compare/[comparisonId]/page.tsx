@@ -22,8 +22,11 @@ import {
   teamMembers,
 } from "@/lib/db/schema";
 import { env } from "@/lib/env";
+import type { Rect } from "@/lib/live/protocol";
+import { bridgeSnippet } from "@/lib/live/protocol";
+import { proxyOriginFor } from "@/lib/live/proxy";
 import { Button } from "@/components/ui/button";
-import { ComparisonWorkspace } from "@/components/comparison/comparison-workspace";
+import { ComparisonWorkspace, type WorkspaceLiveSide } from "@/components/comparison/comparison-workspace";
 import { DeleteComparisonButton } from "@/components/comparisons/delete-comparison-button";
 import { ExportPdfButton } from "@/components/comparisons/export-pdf-button";
 import { RefreshCaptureButton } from "@/components/comparisons/refresh-capture-button";
@@ -57,7 +60,7 @@ export default async function ComparisonDetailPage({
     .innerJoin(pages, eq(comparisons.pageId, pages.id))
     .innerJoin(projects, eq(pages.projectId, projects.id))
     .innerJoin(designAssets, eq(comparisons.designAssetId, designAssets.id))
-    .innerJoin(captureAssets, eq(comparisons.captureAssetId, captureAssets.id))
+    .leftJoin(captureAssets, eq(comparisons.captureAssetId, captureAssets.id))
     .where(
       and(
         eq(comparisons.id, comparisonId),
@@ -68,7 +71,11 @@ export default async function ComparisonDetailPage({
     )
     .limit(1);
 
-  if (!row || !row.design.width || !row.design.height || !row.capture.width || !row.capture.height || !user) {
+  if (!row || !row.design.width || !row.design.height || !user) {
+    notFound();
+  }
+  const capture = row.capture;
+  if (capture && (!capture.width || !capture.height)) {
     notFound();
   }
 
@@ -84,21 +91,25 @@ export default async function ComparisonDetailPage({
     teamMemberRows,
     shareLinkRows,
   ] = await Promise.all([
-    db
-      .select({ elementMap: captures.elementMap })
-      .from(captures)
-      .where(eq(captures.assetId, row.capture.id))
-      .limit(1),
-    getAssetSignedUrls([row.design.storagePath, row.capture.storagePath], {
+    capture
+      ? db
+          .select({ elementMap: captures.elementMap })
+          .from(captures)
+          .where(eq(captures.assetId, capture.id))
+          .limit(1)
+      : [],
+    getAssetSignedUrls(capture ? [row.design.storagePath, capture.storagePath] : [row.design.storagePath], {
       thumbnail: false,
     }),
-    db
-      .select({ assetId: captures.assetId, capturedAt: captures.capturedAt })
-      .from(captures)
-      .innerJoin(assets, eq(captures.assetId, assets.id))
-      .where(and(eq(assets.pageId, pageId), eq(captures.status, "ready")))
-      .orderBy(desc(captures.createdAt))
-      .limit(1),
+    capture
+      ? db
+          .select({ assetId: captures.assetId, capturedAt: captures.capturedAt })
+          .from(captures)
+          .innerJoin(assets, eq(captures.assetId, assets.id))
+          .where(and(eq(assets.pageId, pageId), eq(captures.status, "ready")))
+          .orderBy(desc(captures.createdAt))
+          .limit(1)
+      : [],
     db
       .select({ annotation: annotations, authorEmail: authUsers.email })
       .from(annotations)
@@ -125,13 +136,13 @@ export default async function ComparisonDetailPage({
   ]);
 
   const designUrl = signedUrls.get(row.design.storagePath);
-  const captureUrl = signedUrls.get(row.capture.storagePath);
+  const captureUrl = capture ? signedUrls.get(capture.storagePath) : undefined;
 
-  if (!designUrl || !captureUrl) {
+  if (!designUrl || (capture && !captureUrl)) {
     notFound();
   }
 
-  const hasNewerCapture = latestCapture && latestCapture.assetId !== row.capture.id;
+  const hasNewerCapture = capture && latestCapture && latestCapture.assetId !== capture.id;
 
   const initialAnnotations = annotationRows.map((r, index) => ({
     id: r.annotation.id,
@@ -142,6 +153,10 @@ export default async function ComparisonDetailPage({
     number: index + 1,
     authorId: r.annotation.createdBy,
     authorEmail: r.authorEmail ?? "unknown",
+    elementSelector: r.annotation.elementSelector,
+    elementRect: r.annotation.elementRect as Rect | null,
+    elementText: r.annotation.elementText,
+    pageUrl: r.annotation.pageUrl,
     comments: commentRows
       .filter((c) => c.comment.annotationId === r.annotation.id)
       .map((c) => ({
@@ -169,6 +184,22 @@ export default async function ComparisonDetailPage({
     expiresAt: link.expiresAt?.toISOString() ?? null,
   }));
 
+  const live: WorkspaceLiveSide = capture
+    ? {
+        kind: "capture",
+        image: { src: captureUrl!, width: capture.width!, height: capture.height!, label: "Live" },
+        captureAssetId: capture.id,
+        elementMap: (captureRow?.elementMap as ElementMapEntry[] | null) ?? [],
+      }
+    : {
+        kind: "site",
+        url: row.comparison.liveUrl!,
+        viewportWidth: row.comparison.viewportWidth!,
+        snippet: bridgeSnippet(origin),
+        proxyOrigin: await proxyOriginFor(row.comparison.liveUrl!),
+        viaProxy: row.comparison.liveViaProxy,
+      };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -184,7 +215,7 @@ export default async function ComparisonDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {canEdit && hasNewerCapture ? (
+          {canEdit && hasNewerCapture && latestCapture ? (
             <RefreshCaptureButton comparisonId={comparisonId} newCaptureAssetId={latestCapture.assetId} />
           ) : null}
           {canEdit ? (
@@ -220,17 +251,10 @@ export default async function ComparisonDetailPage({
           height: row.design.height,
           label: "Design",
         }}
-        live={{
-          src: captureUrl,
-          width: row.capture.width,
-          height: row.capture.height,
-          label: "Live",
-        }}
+        live={live}
         designAssetId={row.design.id}
-        captureAssetId={row.capture.id}
         initialAnnotations={initialAnnotations}
         initialSelectedId={initialAnnotations.some((a) => a.id === pin) ? (pin as string) : null}
-        elementMap={(captureRow?.elementMap as ElementMapEntry[] | null) ?? []}
         currentUser={{ id: user.id, email: user.email ?? "unknown" }}
         teamMembers={teamMemberOptions}
         canModerate={canEdit}
