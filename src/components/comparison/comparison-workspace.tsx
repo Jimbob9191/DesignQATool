@@ -29,7 +29,7 @@ type WorkspaceAnnotation = {
   yPx: number;
   status: AnnotationStatus;
   number: number;
-  authorId: string;
+  authorId: string | null;
   authorEmail: string;
   elementSelector: string | null;
   elementRect: Rect | null;

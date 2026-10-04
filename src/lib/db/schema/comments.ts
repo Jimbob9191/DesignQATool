@@ -16,8 +16,10 @@ export const comments = pgTable(
     body: text("body").notNull(),
     // Nullable to allow anonymous comments from public share links (Phase 9)
     // — those set guestName instead. Authenticated comments always set
-    // createdBy and leave guestName null.
-    createdBy: uuid("created_by").references(() => authUsers.id, { onDelete: "cascade" }),
+    // createdBy and leave guestName null, until the author's account is
+    // deleted: then createdBy is set null so the thread stays intact, and a
+    // comment with neither is shown as from a "Former member".
+    createdBy: uuid("created_by").references(() => authUsers.id, { onDelete: "set null" }),
     guestName: text("guest_name"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     editedAt: timestamp("edited_at", { withTimezone: true }),

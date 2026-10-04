@@ -3,6 +3,7 @@ import "server-only";
 import { and, asc, desc, eq, ilike, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { authUsers } from "drizzle-orm/supabase";
 
+import { FORMER_MEMBER } from "@/lib/authors";
 import { db } from "@/lib/db";
 import { annotations, comments, comparisons, pages, projects } from "@/lib/db/schema";
 import { escapeLike, tokenize, type SearchType } from "@/lib/search/text";
@@ -171,7 +172,7 @@ async function searchComments(teamId: string, terms: string[], limit: number) {
 
   return rows.map(({ authorEmail, guestName, ...row }) => ({
     ...row,
-    authorName: authorEmail ?? guestName,
+    authorName: authorEmail ?? guestName ?? FORMER_MEMBER,
   }));
 }
 

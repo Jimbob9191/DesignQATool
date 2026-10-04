@@ -17,6 +17,9 @@ export const invitations = pgTable(
     role: teamRoleEnum("role").notNull().default("member"),
     token: text("token").notNull().unique(),
     status: invitationStatusEnum("status").notNull().default("pending"),
+    // Unlike the content tables' created_by, this stays cascade: a pending
+    // invitation is the inviter's own unfinished action, not shared work, so
+    // deleting the inviter's account withdraws it. An admin can re-invite.
     invitedBy: uuid("invited_by")
       .notNull()
       .references(() => authUsers.id, { onDelete: "cascade" }),

@@ -3,6 +3,7 @@ import "server-only";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { authUsers } from "drizzle-orm/supabase";
 
+import { FORMER_MEMBER } from "@/lib/authors";
 import { db } from "@/lib/db";
 import {
   annotations,
@@ -167,7 +168,7 @@ export async function getActivityFeed(teamId: string, limit = 15): Promise<Activ
         pageName: pages.name,
       })
       .from(annotations)
-      .innerJoin(authUsers, eq(annotations.createdBy, authUsers.id))
+      .leftJoin(authUsers, eq(annotations.createdBy, authUsers.id))
       .innerJoin(comparisons, eq(annotations.comparisonId, comparisons.id))
       .innerJoin(pages, eq(comparisons.pageId, pages.id))
       .innerJoin(projects, eq(pages.projectId, projects.id))
@@ -185,7 +186,7 @@ export async function getActivityFeed(teamId: string, limit = 15): Promise<Activ
         pageName: pages.name,
       })
       .from(comparisons)
-      .innerJoin(authUsers, eq(comparisons.createdBy, authUsers.id))
+      .leftJoin(authUsers, eq(comparisons.createdBy, authUsers.id))
       .innerJoin(pages, eq(comparisons.pageId, pages.id))
       .innerJoin(projects, eq(pages.projectId, projects.id))
       .where(eq(projects.teamId, teamId))
@@ -197,10 +198,10 @@ export async function getActivityFeed(teamId: string, limit = 15): Promise<Activ
     ...recentComments.map((r) => ({
       type: "comment" as const,
       ...r,
-      authorEmail: r.authorEmail ?? r.guestName ?? "Anonymous",
+      authorEmail: r.authorEmail ?? r.guestName ?? FORMER_MEMBER,
     })),
-    ...recentAnnotations.map((r) => ({ type: "annotation" as const, ...r, authorEmail: r.authorEmail ?? "unknown" })),
-    ...recentComparisons.map((r) => ({ type: "comparison" as const, ...r, authorEmail: r.authorEmail ?? "unknown" })),
+    ...recentAnnotations.map((r) => ({ type: "annotation" as const, ...r, authorEmail: r.authorEmail ?? FORMER_MEMBER })),
+    ...recentComparisons.map((r) => ({ type: "comparison" as const, ...r, authorEmail: r.authorEmail ?? FORMER_MEMBER })),
   ];
 
   merged.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

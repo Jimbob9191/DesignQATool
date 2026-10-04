@@ -148,6 +148,13 @@
       "when": 1791100372349,
       "tag": "0020_live_via_proxy",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791139254496,
+      "tag": "0021_keep_content_of_deleted_users",
+      "breakpoints": true
     }
   ]
 }

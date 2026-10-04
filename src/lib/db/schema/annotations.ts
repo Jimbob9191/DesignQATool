@@ -63,9 +63,9 @@ export const annotations = pgTable(
     elementText: text("element_text"),
     pageUrl: text("page_url"),
     status: annotationStatusEnum("status").notNull().default("open"),
-    createdBy: uuid("created_by")
-      .notNull()
-      .references(() => authUsers.id, { onDelete: "cascade" }),
+    // Nullable and set null on delete so removing a user leaves the team's
+    // shared work in place, attributed to "Former member".
+    createdBy: uuid("created_by").references(() => authUsers.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

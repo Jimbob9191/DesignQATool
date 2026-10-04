@@ -18,14 +18,16 @@ type RawAnnotationRow = {
   element_rect: { x: number; y: number; width: number; height: number } | null;
   element_text: string | null;
   page_url: string | null;
-  created_by: string;
+  // Null once the author's account is deleted.
+  created_by: string | null;
 };
 
 type RawCommentRow = {
   id: string;
   annotation_id: string;
   body: string;
-  created_by: string;
+  // Null for guest comments, and once the author's account is deleted.
+  created_by: string | null;
   created_at: string;
   edited_at: string | null;
 };

@@ -20,9 +20,9 @@ export const shareLinks = pgTable(
     token: text("token").notNull().unique(),
     allowAnonymousComments: boolean("allow_anonymous_comments").notNull().default(false),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
-    createdBy: uuid("created_by")
-      .notNull()
-      .references(() => authUsers.id, { onDelete: "cascade" }),
+    // Nullable and set null on delete so removing a user leaves the team's
+    // shared work in place, attributed to "Former member".
+    createdBy: uuid("created_by").references(() => authUsers.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
