@@ -114,22 +114,31 @@ export async function confirmUpload(input: unknown): Promise<ActionResult<{ id: 
   return { success: true, data: asset };
 }
 
-export async function deleteAsset(assetId: string): Promise<void> {
+export async function deleteAsset(assetId: string): Promise<ActionResult<{ id: string }>> {
   const { team } = await requireTeamRole("member");
 
+  // The row goes first: if that fails nothing has changed, whereas removing
+  // the file first could leave a row pointing at nothing. Comparisons built
+  // on the asset cascade with it, which the delete dialog warns about.
   const [asset] = await db
-    .select({ storagePath: assets.storagePath })
-    .from(assets)
+    .delete(assets)
     .where(and(eq(assets.id, assetId), eq(assets.teamId, team.id)))
-    .limit(1);
+    .returning({ id: assets.id, storagePath: assets.storagePath });
 
-  if (!asset) return;
+  if (!asset) {
+    return { success: false, error: "Asset not found." };
+  }
 
+  // An orphaned file is harmless (nothing can reach it without a row), so a
+  // storage failure is logged rather than reported as a failed delete.
   const admin = createAdminClient();
-  await admin.storage.from(ASSETS_BUCKET).remove([asset.storagePath]);
-  await db.delete(assets).where(and(eq(assets.id, assetId), eq(assets.teamId, team.id)));
+  const { error } = await admin.storage.from(ASSETS_BUCKET).remove([asset.storagePath]);
+  if (error) {
+    console.error(`[assets] could not remove ${asset.storagePath} from storage:`, error.message);
+  }
 
   revalidatePath("/assets");
+  return { success: true, data: { id: asset.id } };
 }
 
 export async function setAssetPage(
