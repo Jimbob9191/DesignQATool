@@ -32,10 +32,13 @@ import { Share2 } from "lucide-react";
 
 export default async function ComparisonDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectSlug: string; pageId: string; comparisonId: string }>;
+  searchParams: Promise<{ pin?: string | string[] }>;
 }) {
   const { projectSlug, pageId, comparisonId } = await params;
+  const { pin } = await searchParams;
   const { team, role } = await getCurrentTeam();
   const canEdit = role !== "viewer";
   const user = await getCurrentUser();
@@ -226,6 +229,7 @@ export default async function ComparisonDetailPage({
         designAssetId={row.design.id}
         captureAssetId={row.capture.id}
         initialAnnotations={initialAnnotations}
+        initialSelectedId={initialAnnotations.some((a) => a.id === pin) ? (pin as string) : null}
         elementMap={(captureRow?.elementMap as ElementMapEntry[] | null) ?? []}
         currentUser={{ id: user.id, email: user.email ?? "unknown" }}
         teamMembers={teamMemberOptions}
