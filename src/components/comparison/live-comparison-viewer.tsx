@@ -73,6 +73,7 @@ export function LiveComparisonViewer({
   onCreateLiveAnnotation,
   onDragAnnotation,
   onViaProxyChange,
+  commentPanel,
 }: {
   design: ComparisonImage;
   site: LiveSite;
@@ -84,6 +85,8 @@ export function LiveComparisonViewer({
   onCreateLiveAnnotation?: (pick: LivePick) => void;
   onDragAnnotation?: (id: string, next: { xRatio: number; yPx: number }) => void;
   onViaProxyChange?: (viaProxy: boolean) => void;
+  /** Floated over the right edge of the canvas. */
+  commentPanel?: React.ReactNode;
 }) {
   const [layout, setLayout] = useState<Layout>("side-by-side");
   const [singlePane, setSinglePane] = useState<PaneId>("live");
@@ -589,6 +592,8 @@ export function LiveComparisonViewer({
         ref={rootRef}
         className={cn(
           "relative flex h-[70vh] overflow-hidden rounded-lg border border-border",
+          // Room taken on the right by the floating comment panel, or its show button.
+          "[&:has([data-comment-panel=open])]:[--comment-inset:21rem] [&:has([data-comment-panel=closed])]:[--comment-inset:5.5rem]",
           layout === "stacked" ? "flex-col" : "flex-row"
         )}
       >
@@ -629,6 +634,7 @@ export function LiveComparisonViewer({
         <div className={cn("relative min-w-0 flex-1", !showLive && "hidden", layout === "single" && "h-full")}>
           {livePane}
         </div>
+        {commentPanel}
       </div>
 
       <p className="text-xs text-muted-foreground">

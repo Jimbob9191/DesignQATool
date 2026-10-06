@@ -11,7 +11,7 @@ import { FORMER_MEMBER, guestAuthor } from "@/lib/authors";
 import { useComparisonRealtime } from "@/lib/realtime/use-comparison-realtime";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { AnnotationThread, CommentSidebar } from "@/components/comments/comment-sidebar";
+import { AnnotationThread, CommentSidebar, ShowCommentsButton } from "@/components/comments/comment-sidebar";
 import type { TeamMemberOption } from "@/components/comments/comment-composer";
 import type { CommentData } from "@/components/comments/comment-item";
 import {
@@ -59,6 +59,8 @@ export type WorkspaceLiveSide =
       viaProxy: boolean;
     };
 
+const COMMENTS_OPEN_KEY = "comparison-comments-open";
+
 export function ComparisonWorkspace({
   comparisonId,
   design,
@@ -84,6 +86,23 @@ export function ComparisonWorkspace({
   const [annotations, setAnnotations] = useState<WorkspaceAnnotation[]>(initialAnnotations);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [viaProxy, setViaProxy] = useState(live.kind === "site" && live.viaProxy);
+  const [commentsOpen, setCommentsOpen] = useState(true);
+
+  // Remember whether the comment panel was hidden, so it stays out of the way
+  // across comparisons. Read after mount to keep the server render stable.
+  useEffect(() => {
+    if (localStorage.getItem(COMMENTS_OPEN_KEY) === "false") setCommentsOpen(false);
+  }, []);
+
+  function toggleComments(open: boolean) {
+    setCommentsOpen(open);
+    localStorage.setItem(COMMENTS_OPEN_KEY, String(open));
+  }
+
+  // Picking or dropping a pin needs its thread, so bring the panel back.
+  useEffect(() => {
+    if (selectedId) setCommentsOpen(true);
+  }, [selectedId]);
 
   async function handleViaProxyChange(next: boolean) {
     setViaProxy(next);
@@ -372,7 +391,8 @@ export function ComparisonWorkspace({
 
   const threads: AnnotationThread[] = annotations
     .slice()
-    .sort((a, b) => a.number - b.number)
+    // Newest first, so a pin you've just dropped is at the top of the panel.
+    .sort((a, b) => b.number - a.number)
     .map((a) => ({
       id: a.id,
       number: a.number,
@@ -382,6 +402,23 @@ export function ComparisonWorkspace({
       detail: live.kind === "site" ? livePinDetail(a, live.url) : null,
       comments: a.comments,
     }));
+
+  const commentPanel = commentsOpen ? (
+    <CommentSidebar
+      threads={threads}
+      selectedId={selectedId}
+      onSelect={setSelectedId}
+      onStatusChange={canModerate ? handleStatusChange : undefined}
+      teamMembers={teamMembers}
+      currentUserId={currentUser.id}
+      onAddComment={handleAddComment}
+      onUpdateComment={handleUpdateComment}
+      onDeleteComment={handleDeleteComment}
+      onClose={() => toggleComments(false)}
+    />
+  ) : (
+    <ShowCommentsButton count={threads.length} onClick={() => toggleComments(true)} />
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -407,51 +444,40 @@ export function ComparisonWorkspace({
         </div>
       ) : null}
 
-      <div className="flex items-start gap-4">
-        <div className="min-w-0 flex-1">
-          {live.kind === "capture" ? (
-            <ComparisonViewer
-              design={design}
-              live={live.image}
-              annotations={annotations}
-              selectedAnnotationId={selectedId}
-              onSelectAnnotation={setSelectedId}
-              onCreateAnnotation={handleCreate}
-              onDragAnnotation={canModerate ? handleDrag : undefined}
-              elementMap={live.elementMap}
-            />
-          ) : (
-            <LiveComparisonViewer
-              design={design}
-              site={{
-                url: live.url,
-                viewportWidth: live.viewportWidth,
-                label: "Live",
-                proxyOrigin: live.proxyOrigin,
-                viaProxy,
-              }}
-              snippet={live.snippet}
-              annotations={annotations}
-              selectedAnnotationId={selectedId}
-              onSelectAnnotation={setSelectedId}
-              onCreateDesignAnnotation={(point) => handleCreate("design", point, null)}
-              onCreateLiveAnnotation={(pick) => handleCreateLive(pick, live.viewportWidth)}
-              onDragAnnotation={canModerate ? handleDrag : undefined}
-              onViaProxyChange={canModerate ? handleViaProxyChange : undefined}
-            />
-          )}
-        </div>
-        <CommentSidebar
-          threads={threads}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          onStatusChange={canModerate ? handleStatusChange : undefined}
-          teamMembers={teamMembers}
-          currentUserId={currentUser.id}
-          onAddComment={handleAddComment}
-          onUpdateComment={handleUpdateComment}
-          onDeleteComment={handleDeleteComment}
-        />
+      <div className="min-w-0">
+        {live.kind === "capture" ? (
+          <ComparisonViewer
+            design={design}
+            live={live.image}
+            annotations={annotations}
+            selectedAnnotationId={selectedId}
+            onSelectAnnotation={setSelectedId}
+            onCreateAnnotation={handleCreate}
+            onDragAnnotation={canModerate ? handleDrag : undefined}
+            elementMap={live.elementMap}
+            commentPanel={commentPanel}
+          />
+        ) : (
+          <LiveComparisonViewer
+            design={design}
+            site={{
+              url: live.url,
+              viewportWidth: live.viewportWidth,
+              label: "Live",
+              proxyOrigin: live.proxyOrigin,
+              viaProxy,
+            }}
+            snippet={live.snippet}
+            annotations={annotations}
+            selectedAnnotationId={selectedId}
+            onSelectAnnotation={setSelectedId}
+            onCreateDesignAnnotation={(point) => handleCreate("design", point, null)}
+            onCreateLiveAnnotation={(pick) => handleCreateLive(pick, live.viewportWidth)}
+            onDragAnnotation={canModerate ? handleDrag : undefined}
+            onViaProxyChange={canModerate ? handleViaProxyChange : undefined}
+            commentPanel={commentPanel}
+          />
+        )}
       </div>
     </div>
   );

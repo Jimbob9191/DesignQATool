@@ -278,7 +278,12 @@ function ConnectHelp({
   const canSwitch = Boolean(connection?.onChange) && (viaProxy || connection?.proxyAvailable);
 
   return (
-    <div className="absolute inset-x-3 top-3 rounded-lg border border-border bg-background p-4 shadow-lg">
+    // Keeps clear of the floating comment panel (see --comment-inset) while
+    // there's room for the card, and otherwise sits above it.
+    <div
+      className="absolute top-3 left-3 z-30 rounded-lg border border-border bg-background p-4 shadow-lg"
+      style={{ right: "clamp(0.75rem, var(--comment-inset, 0.75rem), 100% - 22rem)" }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-medium">
           <PlugZap className="h-4 w-4 text-status-needs-review" />

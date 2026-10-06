@@ -126,7 +126,13 @@ export function usePanZoom({
     const container = containerRef.current;
     if (!container || disabled) return;
 
+    // Panels floated over the canvas (e.g. comments) scroll and click as normal.
+    function isOverPanel(e: Event) {
+      return e.target instanceof Element && e.target.closest("[data-pan-zoom-ignore]") !== null;
+    }
+
     function handleWheel(e: WheelEvent) {
+      if (isOverPanel(e)) return;
       e.preventDefault();
       if (wheelPans && !e.ctrlKey && !e.metaKey) {
         panBy(-e.deltaX, -e.deltaY);
@@ -145,6 +151,7 @@ export function usePanZoom({
     }
 
     function handlePointerDown(e: PointerEvent) {
+      if (isOverPanel(e)) return;
       const isMiddle = e.button === 1;
       const isSpaceDrag = e.button === 0 && isSpaceDownRef.current;
       if (!isMiddle && !isSpaceDrag) return;

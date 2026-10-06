@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -12,10 +13,12 @@ export function CommentComposer({
   teamMembers,
   onSubmit,
   placeholder = "Reply… (@ to mention)",
+  autoFocus = false,
 }: {
   teamMembers: TeamMemberOption[];
   onSubmit: (body: string) => Promise<void>;
   placeholder?: string;
+  autoFocus?: boolean;
 }) {
   const [value, setValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,6 +95,7 @@ export function CommentComposer({
         ref={textareaRef}
         value={value}
         placeholder={placeholder}
+        autoFocus={autoFocus}
         rows={2}
         onChange={(e) => {
           setValue(e.target.value);
@@ -119,16 +123,18 @@ export function CommentComposer({
               return;
             }
           }
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+          // Enter saves, like a chat; Shift+Enter starts a new line.
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             void handleSubmit();
           }
         }}
       />
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">⌘/Ctrl + Enter to send</span>
+        <span className="text-xs text-muted-foreground">Shift + Enter for a new line</span>
         <Button size="sm" onClick={handleSubmit} disabled={!value.trim() || isSubmitting}>
-          Reply
+          <Check className="h-4 w-4" />
+          Save
         </Button>
       </div>
     </div>

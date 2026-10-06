@@ -21,10 +21,12 @@ export function OverlayViewer({
   mode,
   design,
   live,
+  commentPanel,
 }: {
   mode: OverlayMode;
   design: ComparisonImage;
   live: ComparisonImage;
+  commentPanel?: React.ReactNode;
 }) {
   const [view, setView] = useState<PanZoomState>(INITIAL_VIEW);
   const [alignScale, setAlignScale] = useState(1);
@@ -282,6 +284,7 @@ export function OverlayViewer({
             viewState={view}
           />
         ) : null}
+        {commentPanel}
       </div>
 
       <p className="text-xs text-muted-foreground">
