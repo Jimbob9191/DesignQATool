@@ -6,7 +6,7 @@ import { AlertCircle, Clock, GitCompare } from "lucide-react";
 
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import { getAssetComparisonNames } from "@/lib/assets/usage";
-import { getCurrentTeam } from "@/lib/auth/team";
+import { getCurrentTeam, redirectToOwningTeam } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { assets, captures, comparisons, pages, projects } from "@/lib/db/schema";
 import { env } from "@/lib/env";
@@ -36,6 +36,7 @@ export default async function PageDetailPage({
     .limit(1);
 
   if (!row) {
+    await redirectToOwningTeam({ projectSlug, pageId }, `/projects/${projectSlug}/${pageId}`);
     notFound();
   }
 

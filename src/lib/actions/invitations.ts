@@ -2,13 +2,12 @@
 
 import { randomBytes } from "node:crypto";
 
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { authUsers } from "drizzle-orm/supabase";
 import { z } from "zod";
 
-import { CURRENT_TEAM_COOKIE, getCurrentUser, requireTeamRole } from "@/lib/auth/team";
+import { getCurrentUser, requireTeamRole, setCurrentTeamCookie } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { invitations, teamMembers } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email/resend";
@@ -156,13 +155,7 @@ export async function acceptInvitation(token: string): Promise<ActionResult<{ te
 
   await db.update(invitations).set({ status: "accepted" }).where(eq(invitations.id, invitation.id));
 
-  const cookieStore = await cookies();
-  cookieStore.set(CURRENT_TEAM_COOKIE, invitation.teamId, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  });
+  await setCurrentTeamCookie(invitation.teamId);
 
   revalidatePath("/", "layout");
   return { success: true, data: { teamId: invitation.teamId } };

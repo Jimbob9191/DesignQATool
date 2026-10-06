@@ -8,7 +8,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import type { ElementMapEntry } from "@/lib/annotations/hit-test";
-import { getCurrentUser, getCurrentTeam } from "@/lib/auth/team";
+import { getCurrentUser, getCurrentTeam, redirectToOwningTeam } from "@/lib/auth/team";
 import { FORMER_MEMBER } from "@/lib/authors";
 import { db } from "@/lib/db";
 import {
@@ -72,7 +72,15 @@ export default async function ComparisonDetailPage({
     )
     .limit(1);
 
-  if (!row || !row.design.width || !row.design.height || !user) {
+  if (!row) {
+    const path = `/projects/${projectSlug}/${pageId}/compare/${comparisonId}`;
+    await redirectToOwningTeam(
+      { projectSlug, pageId, comparisonId },
+      typeof pin === "string" ? `${path}?pin=${encodeURIComponent(pin)}` : path
+    );
+    notFound();
+  }
+  if (!row.design.width || !row.design.height || !user) {
     notFound();
   }
   const capture = row.capture;
