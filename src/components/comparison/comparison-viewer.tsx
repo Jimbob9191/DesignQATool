@@ -54,6 +54,7 @@ export function ComparisonViewer({
   onCreateAnnotation,
   onDragAnnotation,
   elementMap,
+  commentPanel,
 }: {
   design: ComparisonImage;
   live: ComparisonImage;
@@ -67,6 +68,8 @@ export function ComparisonViewer({
   ) => void;
   onDragAnnotation?: (id: string, next: { xRatio: number; yPx: number }) => void;
   elementMap?: ElementMapEntry[];
+  /** Floated over the right edge of the canvas. */
+  commentPanel?: React.ReactNode;
 }) {
   const [layout, setLayout] = useState<Layout>("side-by-side");
   const [singlePane, setSinglePane] = useState<PaneId>("design");
@@ -376,7 +379,7 @@ export function ComparisonViewer({
       </div>
 
       {layout === "overlay" || layout === "swipe" ? (
-        <OverlayViewer mode={layout} design={design} live={live} />
+        <OverlayViewer mode={layout} design={design} live={live} commentPanel={commentPanel} />
       ) : (
         <>
           <div
@@ -423,6 +426,7 @@ export function ComparisonViewer({
                 </div>
               </>
             )}
+            {commentPanel}
           </div>
 
           <p className="text-xs text-muted-foreground">

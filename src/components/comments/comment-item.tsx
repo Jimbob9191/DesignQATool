@@ -7,6 +7,7 @@ import { deleteComment, updateComment } from "@/lib/actions/comments";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 export type CommentData = {
   id: string;
@@ -20,15 +21,19 @@ export type CommentData = {
 export function CommentItem({
   comment,
   currentUserId,
+  isEditing,
+  onEditingChange,
   onUpdated,
   onDeleted,
 }: {
   comment: CommentData;
   currentUserId: string;
+  /** Controlled by the list, so only one comment is ever being edited. */
+  isEditing: boolean;
+  onEditingChange: (editing: boolean) => void;
   onUpdated: (id: string, body: string) => void;
   onDeleted: (id: string) => void;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(comment.body);
   const isOwn = comment.createdBy === currentUserId;
 
@@ -41,7 +46,7 @@ export function CommentItem({
       return;
     }
     onUpdated(comment.id, trimmed);
-    setIsEditing(false);
+    onEditingChange(false);
   }
 
   async function handleDelete() {
@@ -54,7 +59,7 @@ export function CommentItem({
   }
 
   return (
-    <div className="flex gap-2">
+    <div className={cn("flex gap-2", isEditing && "-m-2 rounded-md bg-background p-2 ring-2 ring-primary")}>
       <Avatar className="h-6 w-6 shrink-0">
         <AvatarFallback className="text-[10px]">
           {comment.authorEmail.slice(0, 2).toUpperCase()}
@@ -70,19 +75,12 @@ export function CommentItem({
         </div>
         {isEditing ? (
           <div className="flex flex-col gap-1.5">
-            <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} />
+            <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} autoFocus />
             <div className="flex gap-2">
               <Button size="sm" onClick={handleSaveEdit}>
                 Save
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setDraft(comment.body);
-                  setIsEditing(false);
-                }}
-              >
+              <Button size="sm" variant="ghost" onClick={() => onEditingChange(false)}>
                 Cancel
               </Button>
             </div>
@@ -95,7 +93,10 @@ export function CommentItem({
             <button
               type="button"
               className="text-xs text-muted-foreground hover:text-foreground hover:underline"
-              onClick={() => setIsEditing(true)}
+              onClick={() => {
+                setDraft(comment.body);
+                onEditingChange(true);
+              }}
             >
               Edit
             </button>
