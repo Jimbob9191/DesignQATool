@@ -8,6 +8,7 @@ import {
   safeNext,
   submittedEmail,
 } from "../src/lib/auth/form-state.ts";
+import { isTeamScopedPath, switchTeamHref } from "../src/lib/auth/team-switch.ts";
 import {
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -192,4 +193,26 @@ test("invitation and comment emails escape user-controlled fields in HTML", () =
   assert.ok(!comment.html.includes('<a href="https://phish.example">'));
   assert.match(comment.subject, /mentioned you/);
   assert.ok(comment.text.includes('<a href="https://phish.example">click</a>'), "text body stays verbatim");
+});
+
+test("switchTeamHref encodes the team and the return path", () => {
+  assert.equal(
+    switchTeamHref("a1b2", "/projects/site/p1/compare/c1?pin=x&y=1"),
+    "/switch-team?to=a1b2&next=%2Fprojects%2Fsite%2Fp1%2Fcompare%2Fc1%3Fpin%3Dx%26y%3D1"
+  );
+});
+
+test("isTeamScopedPath flags URLs that belong to one team", () => {
+  assert.equal(isTeamScopedPath("/projects/site", ""), true);
+  assert.equal(isTeamScopedPath("/projects/site/p1/compare/c1", "?pin=x"), true);
+  assert.equal(isTeamScopedPath("/assets", "?page=p1&kind=design"), true);
+});
+
+test("isTeamScopedPath keeps URLs that make sense in any team", () => {
+  assert.equal(isTeamScopedPath("/projects", ""), false);
+  assert.equal(isTeamScopedPath("/assets", ""), false);
+  assert.equal(isTeamScopedPath("/assets", "?page=unassigned"), false);
+  assert.equal(isTeamScopedPath("/assets", "?kind=design"), false);
+  assert.equal(isTeamScopedPath("/dashboard", ""), false);
+  assert.equal(isTeamScopedPath("/search", "?q=projects/"), false);
 });

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { createTeam, switchTeam } from "@/lib/actions/teams";
+import { isTeamScopedPath } from "@/lib/auth/team-switch";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -50,6 +51,17 @@ export function TeamSwitcher({
     defaultValues: { name: "" },
   });
 
+  // Both switching and creating a team change the current team. A project,
+  // page or comparison URL belongs to the team being left, so refreshing it
+  // would only 404; start the new team on its dashboard instead.
+  function showNewTeam() {
+    if (isTeamScopedPath(window.location.pathname, window.location.search)) {
+      router.push("/dashboard");
+    } else {
+      router.refresh();
+    }
+  }
+
   async function handleSwitch(teamId: string) {
     if (teamId === currentTeamId) return;
     const result = await switchTeam(teamId);
@@ -57,7 +69,7 @@ export function TeamSwitcher({
       toast.error(result.error);
       return;
     }
-    router.refresh();
+    showNewTeam();
   }
 
   async function handleCreate(values: z.infer<typeof createTeamSchema>) {
@@ -69,7 +81,7 @@ export function TeamSwitcher({
     toast.success("Team created");
     setCreateOpen(false);
     form.reset();
-    router.refresh();
+    showNewTeam();
   }
 
   return (

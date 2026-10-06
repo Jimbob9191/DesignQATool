@@ -32,7 +32,7 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 
 ---
 
-### [ ] 3. Links into another team's content 404 (notification emails, team switching)
+### [x] 3. Links into another team's content 404 (notification emails, team switching)
 **P1 · M · Touches:** `src/lib/auth/team.ts`, the detail pages under `src/app/(app)/projects/**`, `src/components/app-shell/team-switcher.tsx`
 
 **Problem:** Every page is scoped to the team named by the `current_team_id` cookie (`team.ts:60-76`). Two failures follow:

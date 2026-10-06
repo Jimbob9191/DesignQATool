@@ -3,10 +3,11 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, type SQL } from "drizzle-orm";
 
+import { switchTeamHref } from "@/lib/auth/team-switch";
 import { db } from "@/lib/db";
-import { teamMembers, teams } from "@/lib/db/schema";
+import { comparisons, pages, projects, teamMembers, teams } from "@/lib/db/schema";
 import { createClient } from "@/lib/supabase/server";
 
 export type TeamRole = "owner" | "admin" | "member" | "viewer";
@@ -14,6 +15,19 @@ export type TeamRole = "owner" | "admin" | "member" | "viewer";
 const ROLE_RANK: Record<TeamRole, number> = { viewer: 0, member: 1, admin: 2, owner: 3 };
 
 export const CURRENT_TEAM_COOKIE = "current_team_id";
+
+// Only callable from a Server Action or Route Handler (switchTeam(),
+// createTeam(), acceptInvitation() and the /switch-team route): Server
+// Components can't write cookies during render.
+export async function setCurrentTeamCookie(teamId: string) {
+  const cookieStore = await cookies();
+  cookieStore.set(CURRENT_TEAM_COOKIE, teamId, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+}
 
 export type CurrentUser = { id: string; email: string | undefined };
 
@@ -81,4 +95,45 @@ export async function requireTeamRole(minRole: TeamRole) {
     throw new Error(`Requires ${minRole} role or higher; current role is ${membership.role}.`);
   }
   return membership;
+}
+
+// A detail page calls this when its resource isn't in the current team, just
+// before it 404s. If the resource belongs to another team the user is in — a
+// notification email for team B while team A is selected, or a link from a
+// tab opened before a team switch — it redirects through /switch-team to
+// select that team and come back to `path`. Otherwise it returns and the page
+// 404s as before.
+//
+// The lookup only searches the user's *other* teams, so it reveals nothing
+// about teams they aren't in, and can't loop back to the current team when a
+// page 404s for some other reason. Project slugs are only unique within a
+// team, so if several of the user's teams have a matching project, the
+// oldest membership wins, the same rule getCurrentTeam() falls back on.
+export async function redirectToOwningTeam(
+  resource: { projectSlug: string; pageId?: string; comparisonId?: string },
+  path: string
+): Promise<void> {
+  const [memberships, current] = await Promise.all([getUserTeams(), getCurrentTeam()]);
+  const otherTeamIds = memberships.map((m) => m.team.id).filter((id) => id !== current.team.id);
+  if (otherTeamIds.length === 0) return;
+
+  const conditions: SQL[] = [
+    eq(projects.slug, resource.projectSlug),
+    inArray(projects.teamId, otherTeamIds),
+  ];
+  let query = db.selectDistinct({ teamId: projects.teamId }).from(projects).$dynamic();
+  if (resource.pageId) {
+    query = query.innerJoin(pages, eq(pages.projectId, projects.id));
+    conditions.push(eq(pages.id, resource.pageId));
+  }
+  if (resource.pageId && resource.comparisonId) {
+    query = query.innerJoin(comparisons, eq(comparisons.pageId, pages.id));
+    conditions.push(eq(comparisons.id, resource.comparisonId));
+  }
+  const owners = new Set((await query.where(and(...conditions))).map((r) => r.teamId));
+
+  const owner = otherTeamIds.find((id) => owners.has(id));
+  if (owner) {
+    redirect(switchTeamHref(owner, path));
+  }
 }

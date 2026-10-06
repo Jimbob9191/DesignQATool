@@ -1,11 +1,10 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { CURRENT_TEAM_COOKIE, requireUser } from "@/lib/auth/team";
+import { requireUser, setCurrentTeamCookie } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { teamMembers, teams } from "@/lib/db/schema";
 import { slugify } from "@/lib/slug";
@@ -25,13 +24,7 @@ export async function switchTeam(teamId: string): Promise<ActionResult<true>> {
     return { success: false, error: "You're not a member of that team." };
   }
 
-  const cookieStore = await cookies();
-  cookieStore.set(CURRENT_TEAM_COOKIE, teamId, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  });
+  await setCurrentTeamCookie(teamId);
 
   revalidatePath("/", "layout");
   return { success: true, data: true };
@@ -59,13 +52,7 @@ export async function createTeam(input: unknown): Promise<ActionResult<{ id: str
   const [team] = await db.insert(teams).values({ name: parsed.data.name, slug }).returning({ id: teams.id });
   await db.insert(teamMembers).values({ teamId: team.id, userId: user.id, role: "owner" });
 
-  const cookieStore = await cookies();
-  cookieStore.set(CURRENT_TEAM_COOKIE, team.id, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  });
+  await setCurrentTeamCookie(team.id);
 
   revalidatePath("/", "layout");
   return { success: true, data: team };

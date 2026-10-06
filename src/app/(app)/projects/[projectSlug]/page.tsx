@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { FileText, Plus } from "lucide-react";
 
-import { getCurrentTeam } from "@/lib/auth/team";
+import { getCurrentTeam, redirectToOwningTeam } from "@/lib/auth/team";
 import { getPageStatsForProject } from "@/lib/dashboard/queries";
 import { db } from "@/lib/db";
 import { pages, projects } from "@/lib/db/schema";
@@ -39,6 +39,7 @@ export default async function ProjectDetailPage({
     .limit(1);
 
   if (!project) {
+    await redirectToOwningTeam({ projectSlug }, `/projects/${projectSlug}`);
     notFound();
   }
 
