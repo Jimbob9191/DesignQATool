@@ -6,8 +6,8 @@ export const teamRoleEnum = pgEnum("team_role", ["owner", "admin", "member", "vi
 
 // RLS note: our own server-side Drizzle client connects as the Postgres table
 // owner (via DATABASE_URL), so it bypasses RLS like any Postgres owner does —
-// Server Actions are authorized in application code via requireTeamRole() /
-// getCurrentTeam() (see src/lib/auth/team.ts). These policies are the real
+// Server Actions are authorized in application code via authorizeTeamRole() /
+// getCurrentTeam() (see src/lib/actions/result.ts). These policies are the real
 // enforcement boundary for anything that talks to Postgres as the
 // "authenticated" role directly: Supabase Realtime (Phase 7) and public
 // share links (Phase 9).

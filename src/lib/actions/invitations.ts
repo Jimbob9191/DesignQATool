@@ -7,17 +7,14 @@ import { and, eq } from "drizzle-orm";
 import { authUsers } from "drizzle-orm/supabase";
 import { z } from "zod";
 
-import { getCurrentUser, requireTeamRole, setCurrentTeamCookie } from "@/lib/auth/team";
+import { authorizeTeamRole, isUuid, type ActionResult } from "@/lib/actions/result";
+import { getCurrentUser, setCurrentTeamCookie } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { invitations, teamMembers } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email/resend";
 import { invitationEmail } from "@/lib/email/templates";
 import { env } from "@/lib/env";
 import { consumeRateLimits } from "@/lib/rate-limit";
-
-type ActionResult<T> =
-  | { success: true; data: T; warning?: string }
-  | { success: false; error: string };
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -32,7 +29,9 @@ export async function inviteMember(input: unknown): Promise<ActionResult<{ id: s
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const { team } = await requireTeamRole("admin");
+  const auth = await authorizeTeamRole("admin");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
   const inviter = await getCurrentUser();
   if (!inviter) return { success: false, error: "Not signed in." };
 
@@ -107,18 +106,28 @@ export async function inviteMember(input: unknown): Promise<ActionResult<{ id: s
 }
 
 export async function revokeInvitation(invitationId: string): Promise<ActionResult<true>> {
-  const { team } = await requireTeamRole("admin");
+  if (!isUuid(invitationId)) return { success: false, error: "Invite not found." };
 
-  await db
+  const auth = await authorizeTeamRole("admin");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
+
+  const [revoked] = await db
     .update(invitations)
     .set({ status: "revoked" })
-    .where(and(eq(invitations.id, invitationId), eq(invitations.teamId, team.id), eq(invitations.status, "pending")));
+    .where(and(eq(invitations.id, invitationId), eq(invitations.teamId, team.id), eq(invitations.status, "pending")))
+    .returning({ id: invitations.id });
+  if (!revoked) return { success: false, error: "That invite was already accepted or revoked." };
 
   revalidatePath("/team");
   return { success: true, data: true };
 }
 
 export async function acceptInvitation(token: string): Promise<ActionResult<{ teamId: string }>> {
+  if (typeof token !== "string" || token.length === 0) {
+    return { success: false, error: "This invite is invalid or has expired." };
+  }
+
   const user = await getCurrentUser();
   if (!user) return { success: false, error: "Not signed in." };
 

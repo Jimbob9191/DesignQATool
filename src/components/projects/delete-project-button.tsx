@@ -27,7 +27,9 @@ export function DeleteProjectButton({
       title={`Delete "${projectName}"?`}
       description="This permanently deletes the project and every page, asset, capture, and comment inside it. This can't be undone."
       onConfirm={async () => {
-        await deleteProject(projectId);
+        const result = await deleteProject(projectId);
+        // Thrown errors are shown by the dialog, which stays open.
+        if (!result.success) throw new Error(result.error);
         toast.success("Project deleted");
         if (navigateToListOnDelete) {
           router.push("/projects");

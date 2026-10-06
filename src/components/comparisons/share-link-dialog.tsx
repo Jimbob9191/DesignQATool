@@ -60,7 +60,11 @@ export function ShareLinkDialog({
   }
 
   async function handleRevoke(id: string) {
-    await revokeShareLink(id, comparisonId);
+    const result = await revokeShareLink(id, comparisonId);
+    if (!result.success) {
+      toast.error(result.error);
+      return;
+    }
     toast.success("Share link revoked");
     router.refresh();
   }

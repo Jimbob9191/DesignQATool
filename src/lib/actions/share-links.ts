@@ -8,14 +8,13 @@ import { after } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { getCurrentUser, requireTeamRole } from "@/lib/auth/team";
+import { authorizeTeamRole, isUuid, type ActionResult } from "@/lib/actions/result";
+import { getCurrentUser } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { annotations, comments, comparisons, pages, projects, shareLinks } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { notifyCommentParticipants } from "@/lib/notifications/notify";
 import { clientIp, consumeRateLimits } from "@/lib/rate-limit";
-
-type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
 
 async function resolveOrigin(): Promise<string> {
   const headersList = await headers();
@@ -51,11 +50,12 @@ export async function createShareLink(
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const { team } = await requireTeamRole("member");
+  const auth = await authorizeTeamRole("member");
+  if (!auth.success) return auth;
   const user = await getCurrentUser();
   if (!user) return { success: false, error: "Not signed in." };
 
-  const comparison = await assertComparisonInTeam(parsed.data.comparisonId, team.id);
+  const comparison = await assertComparisonInTeam(parsed.data.comparisonId, auth.data.team.id);
   if (!comparison) return { success: false, error: "Comparison not found." };
 
   const token = randomBytes(18).toString("hex");
@@ -76,19 +76,28 @@ export async function createShareLink(
   return { success: true, data: { url: `${origin}/share/${token}` } };
 }
 
-export async function revokeShareLink(shareLinkId: string, comparisonId: string): Promise<void> {
-  const { team } = await requireTeamRole("member");
+export async function revokeShareLink(
+  shareLinkId: string,
+  comparisonId: string
+): Promise<ActionResult<{ id: string }>> {
+  if (!isUuid(shareLinkId, comparisonId)) return { success: false, error: "Share link not found." };
 
-  const comparison = await assertComparisonInTeam(comparisonId, team.id);
-  if (!comparison) return;
+  const auth = await authorizeTeamRole("member");
+  if (!auth.success) return auth;
 
-  await db
+  const comparison = await assertComparisonInTeam(comparisonId, auth.data.team.id);
+  if (!comparison) return { success: false, error: "Comparison not found." };
+
+  const [shareLink] = await db
     .delete(shareLinks)
-    .where(and(eq(shareLinks.id, shareLinkId), eq(shareLinks.comparisonId, comparisonId)));
+    .where(and(eq(shareLinks.id, shareLinkId), eq(shareLinks.comparisonId, comparisonId)))
+    .returning({ id: shareLinks.id });
+  if (!shareLink) return { success: false, error: "Share link not found." };
 
   revalidatePath(
     `/projects/${comparison.projectSlug}/${comparison.pageId}/compare/${comparisonId}`
   );
+  return { success: true, data: shareLink };
 }
 
 const addAnonymousCommentSchema = z.object({

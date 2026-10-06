@@ -3,12 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 
-import { requireTeamRole } from "@/lib/auth/team";
+import { authorizeTeamRole, isUuid, type ActionResult } from "@/lib/actions/result";
 import { db } from "@/lib/db";
 import { projects } from "@/lib/db/schema";
 import { projectFormSchema } from "@/lib/validations/project";
-
-type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
 
 function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
@@ -22,7 +20,9 @@ export async function createProject(
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const { team } = await requireTeamRole("member");
+  const auth = await authorizeTeamRole("member");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
 
   try {
     const [project] = await db
@@ -53,8 +53,11 @@ export async function updateProject(
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
+  if (!isUuid(projectId)) return { success: false, error: "Project not found." };
 
-  const { team } = await requireTeamRole("member");
+  const auth = await authorizeTeamRole("member");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
 
   try {
     const [project] = await db
@@ -82,10 +85,21 @@ export async function updateProject(
   }
 }
 
-export async function deleteProject(projectId: string): Promise<void> {
-  const { team } = await requireTeamRole("admin");
+export async function deleteProject(projectId: string): Promise<ActionResult<{ id: string }>> {
+  if (!isUuid(projectId)) return { success: false, error: "Project not found." };
 
-  await db.delete(projects).where(and(eq(projects.id, projectId), eq(projects.teamId, team.id)));
+  const auth = await authorizeTeamRole("admin");
+  if (!auth.success) return auth;
+
+  const [project] = await db
+    .delete(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.teamId, auth.data.team.id)))
+    .returning({ id: projects.id });
+
+  if (!project) {
+    return { success: false, error: "Project not found." };
+  }
 
   revalidatePath("/projects");
+  return { success: true, data: project };
 }

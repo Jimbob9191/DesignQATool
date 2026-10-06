@@ -22,7 +22,9 @@ export function DeletePageButton({ trigger, projectId, pageId, pageName }: Delet
       title={`Delete "${pageName}"?`}
       description="This permanently deletes the page and every asset, capture, comparison, and comment inside it. This can't be undone."
       onConfirm={async () => {
-        await deletePage(projectId, pageId);
+        const result = await deletePage(projectId, pageId);
+        // Thrown errors are shown by the dialog, which stays open.
+        if (!result.success) throw new Error(result.error);
         toast.success("Page deleted");
         router.refresh();
       }}

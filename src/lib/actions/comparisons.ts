@@ -4,12 +4,11 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { getCurrentUser, requireTeamRole } from "@/lib/auth/team";
+import { authorizeTeamRole, isUuid, type ActionResult } from "@/lib/actions/result";
+import { getCurrentUser } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { assets, comparisons, pages, projects } from "@/lib/db/schema";
 import { MAX_VIEWPORT_WIDTH, MIN_VIEWPORT_WIDTH } from "@/lib/live/viewports";
-
-type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
 
 const createComparisonSchema = z.object({
   pageId: z.uuid(),
@@ -29,7 +28,9 @@ export async function createComparison(
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const { team } = await requireTeamRole("member");
+  const auth = await authorizeTeamRole("member");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
   const user = await getCurrentUser();
   if (!user) {
     return { success: false, error: "Not signed in." };
@@ -80,20 +81,31 @@ export async function createComparison(
   return { success: true, data: comparison };
 }
 
-export async function deleteComparison(pageId: string, comparisonId: string): Promise<void> {
-  const { team } = await requireTeamRole("member");
+export async function deleteComparison(
+  pageId: string,
+  comparisonId: string
+): Promise<ActionResult<{ id: string }>> {
+  if (!isUuid(pageId, comparisonId)) return { success: false, error: "Comparison not found." };
+
+  const auth = await authorizeTeamRole("member");
+  if (!auth.success) return auth;
 
   const [page] = await db
     .select({ id: pages.id, projectSlug: projects.slug })
     .from(pages)
     .innerJoin(projects, eq(pages.projectId, projects.id))
-    .where(and(eq(pages.id, pageId), eq(projects.teamId, team.id)))
+    .where(and(eq(pages.id, pageId), eq(projects.teamId, auth.data.team.id)))
     .limit(1);
-  if (!page) return;
+  if (!page) return { success: false, error: "Page not found." };
 
-  await db.delete(comparisons).where(and(eq(comparisons.id, comparisonId), eq(comparisons.pageId, pageId)));
+  const [comparison] = await db
+    .delete(comparisons)
+    .where(and(eq(comparisons.id, comparisonId), eq(comparisons.pageId, pageId)))
+    .returning({ id: comparisons.id });
+  if (!comparison) return { success: false, error: "Comparison not found." };
 
   revalidatePath(`/projects/${page.projectSlug}/${pageId}`);
+  return { success: true, data: comparison };
 }
 
 /** Switches a live comparison between the proxy and loading the site directly. */
@@ -106,7 +118,9 @@ export async function setComparisonViaProxy(
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const { team } = await requireTeamRole("member");
+  const auth = await authorizeTeamRole("member");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
 
   const [row] = await db
     .select({ id: comparisons.id, pageId: comparisons.pageId, projectSlug: projects.slug })

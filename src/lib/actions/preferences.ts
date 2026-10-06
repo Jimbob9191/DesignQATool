@@ -4,11 +4,10 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+import type { ActionResult } from "@/lib/actions/result";
 import { requireUser } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { userPreferences } from "@/lib/db/schema";
-
-type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
 
 const preferencesSchema = z.object({
   notifyOnMention: z.boolean(),

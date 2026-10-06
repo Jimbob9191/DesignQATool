@@ -17,26 +17,6 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 
 ## P1 — bugs, data loss, security
 
-### [ ] 5. Server actions throw instead of returning errors; ids aren't validated
-**P1 · M–L · Touches:** everything in `src/lib/actions/*`, plus the client components that call the changed actions. **Do this alone, ideally before the other action-touching tasks (1, 9–14, 18).**
-
-**Problem:**
-- `requireTeamRole` throws (`src/lib/auth/team.ts:78-84`), and so does `assertProjectInTeam` (`pages.ts:13-24`). In production, Next replaces thrown messages with a generic "An error occurred in the Server Components render", so users see nothing useful. Several callers don't catch at all (e.g. `share-link-dialog.tsx:62-66`).
-- Several mutations return `void` and fail silently: `deleteAsset`, `deleteComparison`, `deletePage`, `deleteProject`, `revokeShareLink`, `deleteAnnotation`.
-- Raw string ids reach Postgres unvalidated (`updateAnnotationStatus`, `updateAnnotationPosition`, `updateComment`, `deleteComment`, `revokeInvitation`, `switchTeam`, `acceptInvitation`, …). A malformed uuid throws `22P02`. The `status` argument of `updateAnnotationStatus` isn't validated at runtime.
-- `exportComparisonPdf` calls `response.json()` unguarded (`export.ts:60`). A non-JSON 502/503 from Cloud Run, or the 35s timeout, throws.
-- `ActionResult` is redeclared in every action file.
-
-**Do:**
-- Add `src/lib/actions/result.ts` (not `"use server"`), holding the shared `ActionResult` type and a helper that turns a role failure into `{ success: false, error: "You don't have permission to do that." }`.
-- Have every mutation return `ActionResult`, and validate every id with `z.uuid()`.
-- Update callers to toast `result.error`.
-- Wrap the export fetch in try/catch, with friendly messages for timeout and bad response.
-
-**Done when:** no action throws for expected failures (wrong role, not found, bad id, upstream down), and every UI caller surfaces the message.
-
----
-
 ### [ ] 6. 🗄️ Add indexes for foreign keys and hot filters
 **P1 · S · Touches:** `src/lib/db/schema/*`, new migration
 
@@ -64,7 +44,7 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 ### [ ] 8. Stop building absolute URLs from the request's Host header
 **P1 · S · Touches:** `src/lib/actions/export.ts`, `src/lib/actions/share-links.ts`, `src/app/(app)/projects/[projectSlug]/[pageId]/page.tsx`, `src/app/(app)/projects/[projectSlug]/[pageId]/compare/[comparisonId]/page.tsx`, new `src/lib/origin.ts`
 
-**Problem:** The same "host + x-forwarded-proto" origin logic is copy-pasted four times (`export.ts:14`, `share-links.ts:20`, `[pageId]/page.tsx:98-103`, `compare/page.tsx:174-179`). It's used to build share-link URLs, the bridge snippet, and the print URL that capture-service fetches. Off Vercel, or behind a misconfigured proxy, a spoofed `Host` changes those URLs.
+**Problem:** The same "host + x-forwarded-proto" origin logic is copy-pasted four times (`export.ts:12`, `share-links.ts:19`, `[pageId]/page.tsx:98-103`, `compare/page.tsx:174-179`). It's used to build share-link URLs, the bridge snippet, and the print URL that capture-service fetches. Off Vercel, or behind a misconfigured proxy, a spoofed `Host` changes those URLs.
 
 **Do:** add one `getAppOrigin()` helper. In production it should return `env.NEXT_PUBLIC_SITE_URL`, unless the request host is on an explicit allowlist: the site URL's host, `VERCEL_URL` / `VERCEL_BRANCH_URL` for previews, and localhost in dev. Otherwise it falls back to the site URL. Replace all four copies with it.
 
@@ -77,7 +57,7 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 ### [ ] 9. 🗄️ Keep the original filename of uploads (and allow renaming)
 **P2 · M · Touches:** `src/lib/db/schema/assets.ts`, migration, `src/lib/actions/assets.ts`, `src/lib/validations/asset.ts`, `src/components/assets/asset-card.tsx`, `src/components/comparisons/create-comparison-dialog.tsx`, `src/app/(app)/projects/[projectSlug]/[pageId]/page.tsx`, `src/lib/search/*` (optional)
 
-**Problem:** `requestUploadUrl` receives `filename`, but nothing stores it (`assets.ts:44-72`). Storage paths are `<team>/<uuid>.png`, so asset cards and the "New comparison" design picker label everything with a UUID (`asset-card.tsx:42`, `[pageId]/page.tsx:86,92`). On a real project, picking the right design is guesswork.
+**Problem:** `requestUploadUrl` receives `filename`, but nothing stores it (`assets.ts:43-73`). Storage paths are `<team>/<uuid>.png`, so asset cards and the "New comparison" design picker label everything with a UUID (`asset-card.tsx:42`, `[pageId]/page.tsx:86,92`). On a real project, picking the right design is guesswork.
 
 **Do:** add a nullable `name text` column (max 255). Save the trimmed original filename in `confirmUpload`, and fall back to the storage basename for old rows. Show `name` everywhere a filename is shown today. Add a "Rename" action on the asset card (member+). Optionally show a thumbnail next to each option in the comparison design picker.
 
@@ -176,20 +156,20 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 
 **Do:** overlay numbered pins on the design image in the print page (same math as task 16; share a component if 16 is done). For live pins, list element text and page URL (already there) next to the number. Move the download to a `GET /api/export/[comparisonId]` route handler that authorises the user, calls capture-service, and streams `application/pdf` with `Content-Disposition`. Change the button to a plain link/fetch.
 
-**Conflicts/depends:** shares `export.ts` with tasks 5 and 8. Do it after them, or rebase.
+**Conflicts/depends:** shares `export.ts` with task 8. Do it after that, or rebase.
 
 **Done when:** exported PDFs show numbered pins on the design, and the download is a streamed response.
 
 ---
 
 ### [ ] 18. Wrap multi-step writes in transactions
-**P2 · S–M · Touches:** `src/lib/actions/{teams,invitations,comparisons,annotations}.ts`. **Do after task 5.**
+**P2 · S–M · Touches:** `src/lib/actions/{teams,invitations,comparisons,annotations}.ts`
 
 **Problem:** A failure halfway through leaves inconsistent data:
-- `createTeam` inserts the team, then the owner membership, as two statements (`teams.ts:59-60`). If the second fails, the team is left with no members. Its slug loop also gives up after 20 tries and inserts a taken slug anyway, which hits a unique-violation crash.
-- `acceptInvitation` inserts the membership, then marks the invite accepted, separately (`invitations.ts:149-157`). Two concurrent accepts can both pass the checks.
-- `createComparison` moves the asset onto the page, then inserts the comparison, separately (`comparisons.ts:63-77`).
-- `refreshComparisonCapture` runs one UPDATE per pin in a loop with no transaction (`annotations.ts:235-266`), unless task 25 deletes it.
+- `createTeam` inserts the team, then the owner membership, as two statements (`teams.ts:53-54`). If the second fails, the team is left with no members. Its slug loop also gives up after 20 tries and inserts a taken slug anyway, which hits a unique-violation crash.
+- `acceptInvitation` inserts the membership, then marks the invite accepted, separately (`invitations.ts:158-165`). Two concurrent accepts can both pass the checks.
+- `createComparison` moves the asset onto the page, then inserts the comparison, separately (`comparisons.ts:64-78`).
+- `refreshComparisonCapture` runs one UPDATE per pin in a loop with no transaction (`annotations.ts:265-296`), unless task 25 deletes it.
 
 **Do:** use `db.transaction`. In `acceptInvitation`, lock the row with `UPDATE … WHERE status = 'pending' RETURNING` so only one accept wins. For team slugs, fall back to a short random suffix and retry on a `23505` unique violation.
 
@@ -256,7 +236,7 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 **P2 · S–M · Touches:** `src/lib/actions/assets.ts`, `src/components/assets/upload-dropzone.tsx`
 
 **Problem:**
-- `confirmUpload` trusts the client completely (`assets.ts:74-115`). It never checks that the object actually exists in storage, and the `mime`, `width` and `height` it records are whatever the client says. A client can register an asset row for a file that was never uploaded.
+- `confirmUpload` trusts the client completely (`assets.ts:75-118`). It never checks that the object actually exists in storage, and the `mime`, `width` and `height` it records are whatever the client says. A client can register an asset row for a file that was never uploaded.
 - Each signed upload URL creates a storage object before `confirmUpload` runs. Abandoned uploads leave orphaned objects behind.
 - In the dropzone, the "done" entries pile up forever, and error rows use `key={i}`.
 - There's no paste-from-clipboard support, which is the fastest way to bring in a Figma export.

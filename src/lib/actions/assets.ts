@@ -3,13 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 
-import { getCurrentUser, requireTeamRole } from "@/lib/auth/team";
+import { authorizeTeamRole, isUuid, type ActionResult } from "@/lib/actions/result";
+import { getCurrentUser } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { assets, pages, projects } from "@/lib/db/schema";
 import { ASSETS_BUCKET, createAdminClient } from "@/lib/supabase/admin";
 import { confirmUploadSchema, requestUploadUrlSchema } from "@/lib/validations/asset";
-
-type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
 
 function extensionFor(mime: string): string {
   switch (mime) {
@@ -49,7 +48,9 @@ export async function requestUploadUrl(
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const { team } = await requireTeamRole("member");
+  const auth = await authorizeTeamRole("member");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
 
   if (parsed.data.pageId) {
     const pageCheck = await assertPageInTeam(parsed.data.pageId, team.id);
@@ -77,7 +78,9 @@ export async function confirmUpload(input: unknown): Promise<ActionResult<{ id: 
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const { team } = await requireTeamRole("member");
+  const auth = await authorizeTeamRole("member");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
   const user = await getCurrentUser();
   if (!user) {
     return { success: false, error: "Not signed in." };
@@ -115,7 +118,11 @@ export async function confirmUpload(input: unknown): Promise<ActionResult<{ id: 
 }
 
 export async function deleteAsset(assetId: string): Promise<ActionResult<{ id: string }>> {
-  const { team } = await requireTeamRole("member");
+  if (!isUuid(assetId)) return { success: false, error: "Asset not found." };
+
+  const auth = await authorizeTeamRole("member");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
 
   // The row goes first: if that fails nothing has changed, whereas removing
   // the file first could leave a row pointing at nothing. Comparisons built
@@ -145,7 +152,12 @@ export async function setAssetPage(
   assetId: string,
   pageId: string | null
 ): Promise<ActionResult<{ id: string }>> {
-  const { team } = await requireTeamRole("member");
+  if (!isUuid(assetId)) return { success: false, error: "Asset not found." };
+  if (pageId !== null && !isUuid(pageId)) return { success: false, error: "Page not found." };
+
+  const auth = await authorizeTeamRole("member");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
 
   if (pageId) {
     const pageCheck = await assertPageInTeam(pageId, team.id);
