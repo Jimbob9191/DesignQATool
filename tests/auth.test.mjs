@@ -5,6 +5,9 @@ import {
   fieldErrorsFrom,
   friendlyAuthError,
   initialAuthState,
+  LOGIN_ERROR_MESSAGES,
+  loginErrorMessage,
+  parseEmailOtpType,
   safeNext,
   submittedEmail,
 } from "../src/lib/auth/form-state.ts";
@@ -193,6 +196,34 @@ test("invitation and comment emails escape user-controlled fields in HTML", () =
   assert.ok(!comment.html.includes('<a href="https://phish.example">'));
   assert.match(comment.subject, /mentioned you/);
   assert.ok(comment.text.includes('<a href="https://phish.example">click</a>'), "text body stays verbatim");
+});
+
+test("loginErrorMessage maps known codes to their message", () => {
+  assert.equal(loginErrorMessage("link_invalid"), LOGIN_ERROR_MESSAGES.link_invalid);
+});
+
+test("loginErrorMessage drops free text, unknown codes and non-strings", () => {
+  assert.equal(loginErrorMessage("Your account is locked, call 555-0100"), undefined);
+  assert.equal(loginErrorMessage("That link is invalid or has expired."), undefined);
+  assert.equal(loginErrorMessage("toString"), undefined);
+  assert.equal(loginErrorMessage("__proto__"), undefined);
+  assert.equal(loginErrorMessage(""), undefined);
+  assert.equal(loginErrorMessage(undefined), undefined);
+  assert.equal(loginErrorMessage(["link_invalid"]), undefined);
+});
+
+test("parseEmailOtpType accepts the types Supabase emails", () => {
+  for (const type of ["signup", "invite", "magiclink", "recovery", "email_change", "email"]) {
+    assert.equal(parseEmailOtpType(type), type);
+  }
+});
+
+test("parseEmailOtpType rejects anything else", () => {
+  assert.equal(parseEmailOtpType(null), null);
+  assert.equal(parseEmailOtpType(""), null);
+  assert.equal(parseEmailOtpType("sms"), null);
+  assert.equal(parseEmailOtpType("SIGNUP"), null);
+  assert.equal(parseEmailOtpType("signup "), null);
 });
 
 test("switchTeamHref encodes the team and the return path", () => {

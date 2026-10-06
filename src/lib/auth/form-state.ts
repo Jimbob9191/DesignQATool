@@ -3,7 +3,7 @@
 // functions, so constants and sync helpers cannot be exported from there.
 // Keeping them here also makes them directly unit-testable.
 
-import type { AuthError } from "@supabase/supabase-js";
+import type { AuthError, EmailOtpType } from "@supabase/supabase-js";
 import type { ZodError } from "zod";
 
 export type AuthField = "email" | "password" | "confirmPassword";
@@ -81,4 +81,34 @@ export function safeNext(value: unknown): string {
     return value;
   }
   return "/dashboard";
+}
+
+/**
+ * /login shows an error from its query string, so the query string carries a
+ * code, never the text itself. Rendering arbitrary text there would let anyone
+ * craft an official-looking login page that says "Your account is locked, call
+ * …"; unknown codes are dropped instead.
+ */
+export const LOGIN_ERROR_MESSAGES = {
+  link_invalid: "That link is invalid or has expired.",
+} as const;
+
+export type LoginErrorCode = keyof typeof LOGIN_ERROR_MESSAGES;
+
+export function loginErrorMessage(code: unknown): string | undefined {
+  return typeof code === "string" && Object.hasOwn(LOGIN_ERROR_MESSAGES, code)
+    ? LOGIN_ERROR_MESSAGES[code as LoginErrorCode]
+    : undefined;
+}
+
+// supabase-js widens EmailOtpType with (string & {}), so the type alone
+// doesn't stop an arbitrary string reaching verifyOtp. These are its named
+// members.
+const EMAIL_OTP_TYPES = ["signup", "invite", "magiclink", "recovery", "email_change", "email"] as const;
+
+/** The `type` param of an emailed confirm link, if it's one Supabase issues. */
+export function parseEmailOtpType(value: unknown): EmailOtpType | null {
+  return typeof value === "string" && (EMAIL_OTP_TYPES as readonly string[]).includes(value)
+    ? (value as EmailOtpType)
+    : null;
 }
