@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -35,6 +36,7 @@ export const captures = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("captures_asset_id_created_at_idx").on(table.assetId, table.createdAt),
     pgPolicy("captures_select_team_member", {
       for: "select",
       to: authenticatedRole,

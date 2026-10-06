@@ -17,17 +17,6 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 
 ## P1 — bugs, data loss, security
 
-### [ ] 6. 🗄️ Add indexes for foreign keys and hot filters
-**P1 · S · Touches:** `src/lib/db/schema/*`, new migration
-
-**Problem:** No migration creates a single secondary index (`grep "CREATE INDEX" drizzle/` is empty), and Postgres doesn't index foreign keys automatically. Every page load joins and filters on `pages.project_id`, `comparisons.page_id`, `annotations.comparison_id`, `comments.annotation_id`, `assets.team_id`, `assets.page_id`, `captures.asset_id`, `share_links.comparison_id`, `invitations.team_id` and `team_members.user_id` (the PK is `(team_id, user_id)`, so lookups by user alone can't use it). Cascading deletes also scan whole child tables, and the RLS helper functions run these lookups per row.
-
-**Do:** add `index()` entries in the drizzle table definitions for those columns. Composites are worth it where queries filter by both, e.g. `annotations(comparison_id, created_at)` and `assets(team_id, created_at)`. Generate the migration. Use `CREATE INDEX IF NOT EXISTS`, and consider `CONCURRENTLY` in a hand-written migration if tables are large.
-
-**Done when:** the migration generates cleanly and `EXPLAIN` on the compare-page queries shows index scans.
-
----
-
 ### [ ] 8. Stop building absolute URLs from the request's Host header
 **P1 · S · Touches:** `src/lib/actions/export.ts`, `src/lib/actions/share-links.ts`, `src/app/(app)/projects/[projectSlug]/[pageId]/page.tsx`, `src/app/(app)/projects/[projectSlug]/[pageId]/compare/[comparisonId]/page.tsx`, new `src/lib/origin.ts`
 

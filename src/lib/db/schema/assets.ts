@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  index,
   integer,
   pgEnum,
   pgPolicy,
@@ -43,6 +44,8 @@ export const assets = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("assets_team_id_created_at_idx").on(table.teamId, table.createdAt),
+    index("assets_page_id_created_at_idx").on(table.pageId, table.createdAt),
     pgPolicy("assets_select_team_member", {
       for: "select",
       to: authenticatedRole,

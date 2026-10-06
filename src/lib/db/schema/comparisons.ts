@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, integer, pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { authenticatedRole, authUsers } from "drizzle-orm/supabase";
 
 import { assets } from "./assets";
@@ -32,6 +32,10 @@ export const comparisons = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("comparisons_page_id_created_at_idx").on(table.pageId, table.createdAt),
+    // Without these, deleting an asset scans every comparison for the cascade.
+    index("comparisons_design_asset_id_idx").on(table.designAssetId),
+    index("comparisons_capture_asset_id_idx").on(table.captureAssetId),
     check(
       "comparisons_capture_or_live",
       sql`${table.captureAssetId} is not null or (${table.liveUrl} is not null and ${table.viewportWidth} is not null)`

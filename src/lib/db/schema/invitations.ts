@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgEnum, pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, pgEnum, pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { authenticatedRole, authUsers } from "drizzle-orm/supabase";
 
 import { teamRoleEnum, teams } from "./teams";
@@ -27,6 +27,7 @@ export const invitations = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("invitations_team_id_created_at_idx").on(table.teamId, table.createdAt),
     // The accept flow runs entirely through Server Actions on the
     // RLS-bypassing `db` client (see teams.ts's RLS note), so these policies
     // only matter for direct Supabase-client access, not app functionality.
