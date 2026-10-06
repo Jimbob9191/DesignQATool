@@ -14,3 +14,5 @@ export const navItems: NavItem[] = [
   { title: "Team", href: "/team", icon: Users },
   { title: "Settings", href: "/settings", icon: Settings },
 ];
+
+export const SIDEBAR_COLLAPSED_COOKIE = "sidebar_collapsed";
