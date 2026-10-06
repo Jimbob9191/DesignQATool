@@ -17,52 +17,6 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 
 ## P1 — bugs, data loss, security
 
-### [x] 1. Deleting a design asset silently deletes every comparison that uses it
-**P1 · S–M · Touches:** `src/lib/actions/assets.ts`, `src/components/assets/asset-card.tsx`, `src/app/(app)/assets/page.tsx`, `src/app/(app)/projects/[projectSlug]/[pageId]/page.tsx`
-
-**Problem:** `comparisons.design_asset_id` is `ON DELETE CASCADE` (`src/lib/db/schema/comparisons.ts:17`). Deleting an asset therefore wipes every comparison built on it, along with all of their pins and comments. The confirm dialog says it only removes "any pins referencing it" (`asset-card.tsx:110`). `deleteAsset` also removes the storage object *before* the DB row (`assets.ts:128-130`): if the DB delete fails, the row is left pointing at a missing file.
-
-**Do:**
-- Count the comparisons that reference the asset, through `design_asset_id` or `capture_asset_id`. Pass the count to `AssetCard` (one grouped query per page, not N+1).
-- If it's used, make the dialog say plainly that N comparisons, with all their pins and comments, will be deleted too. Name them if that's cheap. Fix the inaccurate copy either way.
-- Delete the DB row first, then remove the storage object. Log a storage failure rather than throwing (an orphaned file is harmless).
-- Have `deleteAsset` return an `ActionResult` and show its error in the UI.
-
-**Done when:** deleting an in-use asset tells the user exactly what else will go, and an unused asset deletes as it does today.
-
----
-
-### [x] 3. Links into another team's content 404 (notification emails, team switching)
-**P1 · M · Touches:** `src/lib/auth/team.ts`, the detail pages under `src/app/(app)/projects/**`, `src/components/app-shell/team-switcher.tsx`
-
-**Problem:** Every page is scoped to the team named by the `current_team_id` cookie (`team.ts:60-76`). Two failures follow:
-1. A user in two teams gets a comment notification for team B while their cookie says team A. The email link (`notify.ts:98`) points at a comparison page that filters by `projects.teamId = A`, so it 404s. Search-result and dashboard links have the same problem after a switch.
-2. Switching teams while on a project, page or comparison URL calls `router.refresh()` and keeps the URL (`team-switcher.tsx`, `handleSwitch`). The user lands on a 404.
-
-**Do:**
-- On project, page and comparison detail routes, if the resource isn't in the current team but *is* in another team the user belongs to, switch to that team and render. The cookie can only be written from a Server Action or Route Handler, so this needs a small route or action, e.g. a redirect through `/switch-team?to=<id>&next=<path>`. Keep the access check team-scoped.
-- When switching teams from the switcher, navigate to `/dashboard` if the current path is under `/projects/…` or `/assets?page=…`. Otherwise refresh.
-
-**Done when:** an emailed comparison link opens for a member of that team whatever team they last had selected, and switching teams never strands you on a 404.
-
----
-
-### [ ] 4. Realtime collaboration: deletes don't sync, and everyone shows as "teammate"
-**P1 · M · Touches:** `src/lib/realtime/use-comparison-realtime.ts`, `src/components/comparison/comparison-workspace.tsx`
-
-**Problem:**
-- Comment deletes never reach other viewers. With RLS on, Supabase sends DELETE payloads with only the primary key in `old`. The hook drops any row whose `annotation_id` isn't in the current set (`use-comparison-realtime.ts:72-76`), and `annotation_id` is undefined on deletes.
-- Pins and comments from other people render with author `"teammate"` (`comparison-workspace.tsx:120`, `:165`), even though `teamMembers` (id + email) is already passed in.
-- Guest comments made through share links (`created_by` null, `guest_name` set) also show as "teammate". `RawCommentRow` doesn't include `guest_name`.
-- When dragging a pin or changing its status fails, the error toast appears but the optimistic state isn't rolled back (`handleDrag`, `handleStatusChange`).
-- Your own pins from a second tab are ignored (`row.created_by === currentUser.id`). Dedupe by id instead.
-
-**Do:** pass DELETE events through when only `id` is present (the workspace already removes them by id). Resolve author emails from `teamMembers`, and use `guest_name` + " (guest)" for guests. Roll back drag and status changes on failure. Dedupe inserts by id only.
-
-**Done when:** in two browsers on one comparison, create, edit and delete of pins and comments all mirror correctly, with real names.
-
----
-
 ### [ ] 5. Server actions throw instead of returning errors; ids aren't validated
 **P1 · M–L · Touches:** everything in `src/lib/actions/*`, plus the client components that call the changed actions. **Do this alone, ideally before the other action-touching tasks (1, 9–14, 18).**
 

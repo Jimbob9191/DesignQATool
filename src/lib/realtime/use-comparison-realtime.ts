@@ -28,6 +28,8 @@ type RawCommentRow = {
   body: string;
   // Null for guest comments, and once the author's account is deleted.
   created_by: string | null;
+  // Set instead of created_by on comments left through a share link.
+  guest_name: string | null;
   created_at: string;
   edited_at: string | null;
 };
@@ -62,21 +64,40 @@ export function useComparisonRealtime({
       config: { presence: { key: currentUser.id } },
     });
 
+    // With RLS on, Supabase sends DELETE events with only the primary key in
+    // `old`, and it can't apply a column filter to them either. So deletes
+    // get their own unfiltered subscriptions and are matched by id alone;
+    // the workspace removes rows by id, so an id it doesn't hold is a no-op.
     channel
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "annotations", filter: `comparison_id=eq.${comparisonId}` },
+        { event: "INSERT", schema: "public", table: "annotations", filter: `comparison_id=eq.${comparisonId}` },
         (payload) => onAnnotationChangeRef.current(payload as never)
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "comments" },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as RawCommentRow | undefined;
-          if (!row || !annotationIdsRef.current.includes(row.annotation_id)) return;
-          onCommentChangeRef.current(payload as never);
-        }
+        { event: "UPDATE", schema: "public", table: "annotations", filter: `comparison_id=eq.${comparisonId}` },
+        (payload) => onAnnotationChangeRef.current(payload as never)
       )
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "annotations" }, (payload) => {
+        const id = (payload.old as Partial<RawAnnotationRow>).id;
+        if (!id || !annotationIdsRef.current.includes(id)) return;
+        onAnnotationChangeRef.current(payload as never);
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "comments" }, (payload) => {
+        const row = payload.new as RawCommentRow;
+        if (!annotationIdsRef.current.includes(row.annotation_id)) return;
+        onCommentChangeRef.current(payload as never);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "comments" }, (payload) => {
+        const row = payload.new as RawCommentRow;
+        if (!annotationIdsRef.current.includes(row.annotation_id)) return;
+        onCommentChangeRef.current(payload as never);
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "comments" }, (payload) => {
+        if (!(payload.old as Partial<RawCommentRow>).id) return;
+        onCommentChangeRef.current(payload as never);
+      })
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState<{ email: string }>();
         const users = Object.entries(state).map(([userId, presences]) => ({

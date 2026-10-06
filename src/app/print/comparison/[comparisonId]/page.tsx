@@ -4,7 +4,7 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { authUsers } from "drizzle-orm/supabase";
 
 import { getAssetSignedUrl } from "@/lib/assets/signed-url";
-import { FORMER_MEMBER } from "@/lib/authors";
+import { FORMER_MEMBER, guestAuthor } from "@/lib/authors";
 import { db } from "@/lib/db";
 import { annotations, assets, comments, comparisons, pages, projects } from "@/lib/db/schema";
 import { verifyComparisonExportToken } from "@/lib/exports/sign";
@@ -84,7 +84,7 @@ export default async function PrintComparisonPage({
     comments: commentRows
       .filter((c) => c.comment.annotationId === r.annotation.id)
       .map((c) => ({
-        authorEmail: c.authorEmail ?? c.comment.guestName ?? FORMER_MEMBER,
+        authorEmail: c.authorEmail ?? (c.comment.guestName ? guestAuthor(c.comment.guestName) : FORMER_MEMBER),
         body: c.comment.body,
       })),
   }));
