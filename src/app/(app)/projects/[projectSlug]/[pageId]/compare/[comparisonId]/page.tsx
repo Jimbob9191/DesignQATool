@@ -9,7 +9,7 @@ import { ArrowLeft } from "lucide-react";
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import type { ElementMapEntry } from "@/lib/annotations/hit-test";
 import { getCurrentUser, getCurrentTeam, redirectToOwningTeam } from "@/lib/auth/team";
-import { FORMER_MEMBER } from "@/lib/authors";
+import { FORMER_MEMBER, guestAuthor } from "@/lib/authors";
 import { db } from "@/lib/db";
 import {
   annotations,
@@ -172,7 +172,7 @@ export default async function ComparisonDetailPage({
         id: c.comment.id,
         body: c.comment.body,
         createdBy: c.comment.createdBy,
-        authorEmail: c.authorEmail ?? c.comment.guestName ?? FORMER_MEMBER,
+        authorEmail: c.authorEmail ?? (c.comment.guestName ? guestAuthor(c.comment.guestName) : FORMER_MEMBER),
         createdAt: c.comment.createdAt.toISOString(),
         editedAt: c.comment.editedAt?.toISOString() ?? null,
       })),

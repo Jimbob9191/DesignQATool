@@ -5,7 +5,7 @@ import { ScanEye } from "lucide-react";
 
 import { getAssetSignedUrl } from "@/lib/assets/signed-url";
 import { proxyOriginFor } from "@/lib/live/proxy";
-import { FORMER_MEMBER } from "@/lib/authors";
+import { FORMER_MEMBER, guestAuthor } from "@/lib/authors";
 import { db } from "@/lib/db";
 import { annotations, assets, comments, comparisons, pages, projects, shareLinks } from "@/lib/db/schema";
 import { LivePane } from "@/components/comparison/live-pane";
@@ -93,7 +93,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
         authorName: c.authorEmail
           ? c.authorEmail.split("@")[0]
           : c.comment.guestName
-            ? `${c.comment.guestName} (guest)`
+            ? guestAuthor(c.comment.guestName)
             : FORMER_MEMBER,
         createdAt: c.comment.createdAt.toISOString(),
       })),

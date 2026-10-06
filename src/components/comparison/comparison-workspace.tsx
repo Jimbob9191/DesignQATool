@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { createAnnotation, updateAnnotationPosition, updateAnnotationStatus } from "@/lib/actions/annotations";
 import { createComment } from "@/lib/actions/comments";
 import { setComparisonViaProxy } from "@/lib/actions/comparisons";
 import type { ElementMapEntry } from "@/lib/annotations/hit-test";
+import { FORMER_MEMBER, guestAuthor } from "@/lib/authors";
 import { useComparisonRealtime } from "@/lib/realtime/use-comparison-realtime";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -97,6 +98,16 @@ export function ComparisonWorkspace({
     setAnnotations(initialAnnotations);
   }, [initialAnnotations]);
 
+  const memberEmails = useMemo(() => new Map(teamMembers.map((m) => [m.id, m.email])), [teamMembers]);
+
+  // Realtime rows carry only ids, so resolve the author the same way the
+  // server render does. Someone who joined the team after this page loaded
+  // isn't in teamMembers yet, hence the generic fallback.
+  function authorLabel(createdBy: string | null, guestName: string | null = null): string {
+    if (createdBy) return memberEmails.get(createdBy) ?? (createdBy === currentUser.id ? currentUser.email : "Teammate");
+    return guestName ? guestAuthor(guestName) : FORMER_MEMBER;
+  }
+
   const { presentUsers } = useComparisonRealtime({
     comparisonId,
     annotationIds: annotations.map((a) => a.id),
@@ -105,7 +116,9 @@ export function ComparisonWorkspace({
       if (payload.eventType === "INSERT") {
         const row = payload.new;
         setAnnotations((prev) => {
-          if (prev.some((a) => a.id === row.id) || row.created_by === currentUser.id) return prev;
+          // Dedupe by id only, so your own pins from another tab still appear.
+          // This tab's pins are reconciled when createAnnotation returns.
+          if (prev.some((a) => a.id === row.id)) return prev;
           const nextNumber = prev.length > 0 ? Math.max(...prev.map((a) => a.number)) + 1 : 1;
           return [
             ...prev,
@@ -117,7 +130,7 @@ export function ComparisonWorkspace({
               status: row.status,
               number: nextNumber,
               authorId: row.created_by,
-              authorEmail: "teammate",
+              authorEmail: authorLabel(row.created_by),
               elementSelector: row.element_selector,
               elementRect: row.element_rect,
               elementText: row.element_text,
@@ -150,10 +163,9 @@ export function ComparisonWorkspace({
     onCommentChange: (payload) => {
       if (payload.eventType === "INSERT") {
         const row = payload.new;
-        if (row.created_by === currentUser.id) return; // already applied optimistically
         setAnnotations((prev) =>
           prev.map((a) =>
-            a.id === row.annotation_id
+            a.id === row.annotation_id && !a.comments.some((c) => c.id === row.id)
               ? {
                   ...a,
                   comments: [
@@ -162,7 +174,7 @@ export function ComparisonWorkspace({
                       id: row.id,
                       body: row.body,
                       createdBy: row.created_by,
-                      authorEmail: "teammate",
+                      authorEmail: authorLabel(row.created_by, row.guest_name),
                       createdAt: row.created_at,
                       editedAt: row.edited_at,
                     },
@@ -227,8 +239,14 @@ export function ComparisonWorkspace({
       return;
     }
 
-    setAnnotations((prev) => prev.map((a) => (a.id === tempId ? { ...a, id: result.data.id } : a)));
-    setSelectedId(result.data.id);
+    // The realtime INSERT can beat the action's response, in which case a copy
+    // under the real id is already in state. Keep the optimistic one, which
+    // has the right number, and drop that copy.
+    const realId = result.data.id;
+    setAnnotations((prev) =>
+      prev.filter((a) => a.id !== realId).map((a) => (a.id === tempId ? { ...a, id: realId } : a))
+    );
+    setSelectedId(realId);
   }
 
   function handleCreate(
@@ -263,17 +281,28 @@ export function ComparisonWorkspace({
   }
 
   async function handleDrag(id: string, next: { xRatio: number; yPx: number }) {
+    const before = annotations.find((a) => a.id === id);
+    if (!before) return;
     setAnnotations((prev) =>
       prev.map((a) => (a.id === id ? { ...a, xRatio: next.xRatio, yPx: next.yPx, status: "open" } : a))
     );
     const result = await updateAnnotationPosition(id, next);
-    if (!result.success) toast.error(result.error);
+    if (!result.success) {
+      toast.error(result.error);
+      const { xRatio, yPx, status } = before;
+      setAnnotations((prev) => prev.map((a) => (a.id === id ? { ...a, xRatio, yPx, status } : a)));
+    }
   }
 
   async function handleStatusChange(id: string, status: AnnotationStatus) {
+    const before = annotations.find((a) => a.id === id);
+    if (!before) return;
     setAnnotations((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
     const result = await updateAnnotationStatus(id, status);
-    if (!result.success) toast.error(result.error);
+    if (!result.success) {
+      toast.error(result.error);
+      setAnnotations((prev) => prev.map((a) => (a.id === id ? { ...a, status: before.status } : a)));
+    }
   }
 
   async function handleAddComment(annotationId: string, body: string) {
@@ -300,10 +329,17 @@ export function ComparisonWorkspace({
       );
       return;
     }
+    // As with pins, the realtime INSERT may already have added this comment.
+    const realId = result.data.id;
     setAnnotations((prev) =>
       prev.map((a) =>
         a.id === annotationId
-          ? { ...a, comments: a.comments.map((c) => (c.id === tempId ? { ...c, id: result.data.id } : c)) }
+          ? {
+              ...a,
+              comments: a.comments
+                .filter((c) => c.id !== realId)
+                .map((c) => (c.id === tempId ? { ...c, id: realId } : c)),
+            }
           : a
       )
     );
