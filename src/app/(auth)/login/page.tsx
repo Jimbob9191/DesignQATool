@@ -1,6 +1,7 @@
 import { ScanEye } from "lucide-react";
 
 import { LoginForm } from "@/components/auth/login-form";
+import { loginErrorMessage } from "@/lib/auth/form-state";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function LoginPage({
@@ -8,7 +9,8 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ error?: string; next?: string }>;
 }) {
-  const { error, next } = await searchParams;
+  const { error: errorCode, next } = await searchParams;
+  const error = loginErrorMessage(errorCode);
 
   return (
     <Card className="w-full max-w-sm">

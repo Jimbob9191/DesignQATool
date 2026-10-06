@@ -1,3 +1,5 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+
 import Fastify from "fastify";
 import { z } from "zod";
 
@@ -24,59 +26,71 @@ const pdfRequestSchema = z.object({
   url: z.string().url(),
 });
 
+// Hashing both sides first gives timingSafeEqual equal-length inputs, so
+// neither the comparison nor a length check leaks anything about the secret.
+const expectedAuthDigest = createHash("sha256").update(`Bearer ${CAPTURE_SERVICE_SECRET}`).digest();
+
+function isAuthorized(header: string | undefined): boolean {
+  if (!header) {
+    return false;
+  }
+  return timingSafeEqual(createHash("sha256").update(header).digest(), expectedAuthDigest);
+}
+
 const app = Fastify({ logger: true, bodyLimit: 1024 * 1024 });
 
 app.get("/health", async () => ({ ok: true }));
 
-app.post("/capture", async (request, reply) => {
-  const authHeader = request.headers.authorization;
-  if (authHeader !== `Bearer ${CAPTURE_SERVICE_SECRET}`) {
-    return reply.code(401).send({ error: "Unauthorized" });
-  }
+// Everything registered inside this scope needs the bearer token; /health,
+// outside it, stays open for Cloud Run. The check runs on onRequest, before
+// Fastify reads the body, so unauthenticated callers can't make it parse 1MB.
+app.register(async (secured) => {
+  secured.addHook("onRequest", async (request, reply) => {
+    if (!isAuthorized(request.headers.authorization)) {
+      return reply.code(401).send({ error: "Unauthorized" });
+    }
+  });
 
-  const parsed = captureRequestSchema.safeParse(request.body);
-  if (!parsed.success) {
-    return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
-  }
+  secured.post("/capture", async (request, reply) => {
+    const parsed = captureRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
+    }
 
-  try {
-    const result = await runCapture(parsed.data);
-    return reply.send({
-      image: result.image.toString("base64"),
-      mime: "image/webp",
-      width: result.width,
-      height: result.height,
-      imageScale: result.imageScale,
-      elementMap: result.elementMap,
-    });
-  } catch (error) {
-    request.log.error(error);
-    return reply.code(502).send({
-      error: error instanceof Error ? error.message : "Capture failed",
-    });
-  }
-});
+    try {
+      const result = await runCapture(parsed.data);
+      return reply.send({
+        image: result.image.toString("base64"),
+        mime: "image/webp",
+        width: result.width,
+        height: result.height,
+        imageScale: result.imageScale,
+        elementMap: result.elementMap,
+      });
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(502).send({
+        error: error instanceof Error ? error.message : "Capture failed",
+      });
+    }
+  });
 
-app.post("/pdf", async (request, reply) => {
-  const authHeader = request.headers.authorization;
-  if (authHeader !== `Bearer ${CAPTURE_SERVICE_SECRET}`) {
-    return reply.code(401).send({ error: "Unauthorized" });
-  }
+  secured.post("/pdf", async (request, reply) => {
+    const parsed = pdfRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
+    }
 
-  const parsed = pdfRequestSchema.safeParse(request.body);
-  if (!parsed.success) {
-    return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
-  }
-
-  try {
-    const pdf = await runPdf(parsed.data.url);
-    return reply.send({ pdf: pdf.toString("base64") });
-  } catch (error) {
-    request.log.error(error);
-    return reply.code(502).send({
-      error: error instanceof Error ? error.message : "PDF render failed",
-    });
-  }
+    try {
+      const pdf = await runPdf(parsed.data.url);
+      return reply.send({ pdf: pdf.toString("base64") });
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(502).send({
+        error: error instanceof Error ? error.message : "PDF render failed",
+      });
+    }
+  });
 });
 
 async function shutdown() {

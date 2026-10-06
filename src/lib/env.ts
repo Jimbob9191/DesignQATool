@@ -7,6 +7,9 @@ export const env = createEnv({
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
     CAPTURE_SERVICE_URL: z.string().url().optional(),
     CAPTURE_SERVICE_SECRET: z.string().min(1).optional(),
+    // Signs the short-lived PDF export URLs. Unset derives a key from
+    // SUPABASE_SERVICE_ROLE_KEY, so it's only needed to rotate it separately.
+    EXPORT_SIGNING_SECRET: z.string().min(32).optional(),
     // Live-preview proxy (live-proxy/): the domain sites are served from as
     // <label>.LIVE_PROXY_DOMAIN, and the secret labels are signed with. Unset
     // means comparisons can only frame sites directly, via the snippet.

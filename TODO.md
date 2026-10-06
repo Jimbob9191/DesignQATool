@@ -28,19 +28,6 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 
 ---
 
-### [ ] 7. Small security hardening batch
-**P1 · S · Touches:** `src/app/(auth)/login/page.tsx`, `src/app/auth/confirm/route.ts`, `src/lib/exports/sign.ts`, `src/lib/env.ts`, `.env.example`, `capture-service/src/server.ts`
-
-**Problem and fix, item by item:**
-- **Reflected text on `/login?error=…`** (`login/page.tsx:23`): any text in the query string is shown as an official-looking error. That's a phishing vector ("Your account is locked, call …"). Accept an error *code* and map it to known messages, and update `auth/confirm/route.ts:24` to send a code.
-- **`auth/confirm` casts `type` blindly** (`route.ts:11`). Validate it against the allowed `EmailOtpType` values.
-- **PDF export URLs are signed with `SUPABASE_SERVICE_ROLE_KEY`** (`sign.ts:8`). Reusing the most privileged secret as an HMAC key is poor hygiene. Derive a dedicated key (e.g. HMAC the service key with a fixed label), or add an optional `EXPORT_SIGNING_SECRET` that falls back to the derived key. Keep it backwards compatible: links only live 5 minutes.
-- **capture-service compares bearer tokens with `!==`** (`server.ts:33`, `:62`). Use `crypto.timingSafeEqual`, and move the check into one `preHandler` hook.
-
-**Done when:** each item is fixed and covered by a unit test where it's pure (error-code map, otp-type validation).
-
----
-
 ### [ ] 8. Stop building absolute URLs from the request's Host header
 **P1 · S · Touches:** `src/lib/actions/export.ts`, `src/lib/actions/share-links.ts`, `src/app/(app)/projects/[projectSlug]/[pageId]/page.tsx`, `src/app/(app)/projects/[projectSlug]/[pageId]/compare/[comparisonId]/page.tsx`, new `src/lib/origin.ts`
 

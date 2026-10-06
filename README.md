@@ -71,6 +71,8 @@ Without those two variables the app only offers Direct. Locally, `live-proxy/src
 
 PDF exports come from `capture-service/`, a small Fastify + Playwright (Chromium) server (it also still has the old screenshot `/capture` endpoint, which the app no longer calls). The app calls it with `CAPTURE_SERVICE_URL` and authenticates with a shared bearer token, `CAPTURE_SERVICE_SECRET`; without them, export fails with "Export is not configured."
 
+The service renders the app's `/print/comparison/…` page from a signed URL that's valid for 5 minutes. The signing key is derived from `SUPABASE_SERVICE_ROLE_KEY`, or comes from the optional `EXPORT_SIGNING_SECRET` (32+ characters) when that's set. Changing either one only breaks exports that are already running.
+
 It runs on **Google Cloud Run** (project `designparity-capture`, region `us-east4`), scaled to zero when idle so normal usage stays inside the free tier. A £1/month budget alert on the project emails the billing owner if that ever changes. To redeploy after changing it:
 
 ```bash
