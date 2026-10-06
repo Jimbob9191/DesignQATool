@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { authenticatedRole, authUsers } from "drizzle-orm/supabase";
 
 import { annotations } from "./annotations";
@@ -25,6 +25,7 @@ export const comments = pgTable(
     editedAt: timestamp("edited_at", { withTimezone: true }),
   },
   (table) => [
+    index("comments_annotation_id_created_at_idx").on(table.annotationId, table.createdAt),
     pgPolicy("comments_select_team_member", {
       for: "select",
       to: authenticatedRole,

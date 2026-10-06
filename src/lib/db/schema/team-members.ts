@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { type AnyPgColumn, pgPolicy, pgTable, primaryKey, timestamp, uuid } from "drizzle-orm/pg-core";
+import { type AnyPgColumn, index, pgPolicy, pgTable, primaryKey, timestamp, uuid } from "drizzle-orm/pg-core";
 import { authenticatedRole, authUsers } from "drizzle-orm/supabase";
 
 import { teamRoleEnum, teams } from "./teams";
@@ -29,6 +29,9 @@ export const teamMembers = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.teamId, table.userId] }),
+    // The PK leads with team_id, so it can't serve "which teams is this user
+    // in" — the lookup behind every page load and the RLS membership helpers.
+    index("team_members_user_id_idx").on(table.userId),
     // See teams.ts for why membership checks go through SECURITY DEFINER
     // functions instead of inline subqueries on this table.
     pgPolicy("team_members_select_same_team", {

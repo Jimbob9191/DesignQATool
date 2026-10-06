@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  index,
   integer,
   jsonb,
   numeric,
@@ -69,6 +70,8 @@ export const annotations = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("annotations_comparison_id_created_at_idx").on(table.comparisonId, table.createdAt),
+    index("annotations_asset_id_idx").on(table.assetId),
     pgPolicy("annotations_select_team_member", {
       for: "select",
       to: authenticatedRole,

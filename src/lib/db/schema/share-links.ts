@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { authenticatedRole, authUsers } from "drizzle-orm/supabase";
 
 import { comparisons } from "./comparisons";
@@ -26,6 +26,7 @@ export const shareLinks = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("share_links_comparison_id_created_at_idx").on(table.comparisonId, table.createdAt),
     pgPolicy("share_links_select_team_member", {
       for: "select",
       to: authenticatedRole,
