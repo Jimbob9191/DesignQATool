@@ -4,14 +4,15 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { isUuid, type ActionResult } from "@/lib/actions/result";
 import { requireUser, setCurrentTeamCookie } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { teamMembers, teams } from "@/lib/db/schema";
 import { slugify } from "@/lib/slug";
 
-type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
-
 export async function switchTeam(teamId: string): Promise<ActionResult<true>> {
+  if (!isUuid(teamId)) return { success: false, error: "You're not a member of that team." };
+
   const user = await requireUser();
 
   const [membership] = await db

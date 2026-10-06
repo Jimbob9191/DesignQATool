@@ -34,7 +34,7 @@ export function ExportPdfButton({
         return;
       }
 
-      const blob = base64ToBlob(result.pdfBase64, "application/pdf");
+      const blob = base64ToBlob(result.data.pdfBase64, "application/pdf");
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;

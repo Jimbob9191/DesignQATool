@@ -89,12 +89,8 @@ export const getCurrentTeam = cache(async () => {
   return preferred ?? memberships[0];
 });
 
-export async function requireTeamRole(minRole: TeamRole) {
-  const membership = await getCurrentTeam();
-  if (ROLE_RANK[membership.role] < ROLE_RANK[minRole]) {
-    throw new Error(`Requires ${minRole} role or higher; current role is ${membership.role}.`);
-  }
-  return membership;
+export function hasTeamRole(role: TeamRole, minRole: TeamRole): boolean {
+  return ROLE_RANK[role] >= ROLE_RANK[minRole];
 }
 
 // A detail page calls this when its resource isn't in the current team, just

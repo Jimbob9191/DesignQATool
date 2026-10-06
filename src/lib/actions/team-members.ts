@@ -4,11 +4,10 @@ import { revalidatePath } from "next/cache";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { getCurrentUser, requireTeamRole, type TeamRole } from "@/lib/auth/team";
+import { authorizeTeamRole, isUuid, type ActionResult } from "@/lib/actions/result";
+import { getCurrentUser, type TeamRole } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { teamMembers } from "@/lib/db/schema";
-
-type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
 
 const roleSchema = z.enum(["owner", "admin", "member", "viewer"]);
 
@@ -28,8 +27,11 @@ export async function updateMemberRole(
   if (!parsedRole.success) {
     return { success: false, error: "Invalid role." };
   }
+  if (!isUuid(memberUserId)) return { success: false, error: "Member not found." };
 
-  const { team, role: callerRole } = await requireTeamRole("admin");
+  const auth = await authorizeTeamRole("admin");
+  if (!auth.success) return auth;
+  const { team, role: callerRole } = auth.data;
 
   const [existing] = await db
     .select({ role: teamMembers.role })
@@ -65,7 +67,11 @@ export async function updateMemberRole(
 }
 
 export async function removeMember(memberUserId: string): Promise<ActionResult<true>> {
-  const { team } = await requireTeamRole("admin");
+  if (!isUuid(memberUserId)) return { success: false, error: "Member not found." };
+
+  const auth = await authorizeTeamRole("admin");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
 
   const [existing] = await db
     .select({ role: teamMembers.role })
@@ -100,7 +106,9 @@ export async function removeMember(memberUserId: string): Promise<ActionResult<t
 // removeMember requires admin — a plain member/viewer has no way to remove
 // themselves through it, so leaving your own team needs its own action.
 export async function leaveTeam(): Promise<ActionResult<true>> {
-  const { team, role } = await requireTeamRole("viewer");
+  const auth = await authorizeTeamRole("viewer");
+  if (!auth.success) return auth;
+  const { team, role } = auth.data;
   const user = await getCurrentUser();
   if (!user) return { success: false, error: "Not signed in." };
 

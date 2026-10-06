@@ -5,12 +5,11 @@ import { after } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { getCurrentUser, requireTeamRole } from "@/lib/auth/team";
+import { authorizeTeamRole, isUuid, type ActionResult } from "@/lib/actions/result";
+import { getCurrentUser } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { annotations, comments, comparisons, pages, projects } from "@/lib/db/schema";
 import { notifyCommentParticipants } from "@/lib/notifications/notify";
-
-type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
 
 async function assertAnnotationInTeam(annotationId: string, teamId: string) {
   const [row] = await db
@@ -40,11 +39,12 @@ export async function createComment(input: unknown): Promise<ActionResult<{ id: 
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const { team } = await requireTeamRole("viewer");
+  const auth = await authorizeTeamRole("viewer");
+  if (!auth.success) return auth;
   const user = await getCurrentUser();
   if (!user) return { success: false, error: "Not signed in." };
 
-  const annotation = await assertAnnotationInTeam(parsed.data.annotationId, team.id);
+  const annotation = await assertAnnotationInTeam(parsed.data.annotationId, auth.data.team.id);
   if (!annotation) return { success: false, error: "Annotation not found." };
 
   const [comment] = await db
@@ -84,6 +84,7 @@ export async function updateComment(
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
+  if (!isUuid(commentId)) return { success: false, error: "Comment not found." };
 
   const user = await getCurrentUser();
   if (!user) return { success: false, error: "Not signed in." };
@@ -98,8 +99,9 @@ export async function updateComment(
     return { success: false, error: "You can only edit your own comments." };
   }
 
-  const { team } = await requireTeamRole("viewer");
-  const annotation = await assertAnnotationInTeam(existing.annotationId, team.id);
+  const auth = await authorizeTeamRole("viewer");
+  if (!auth.success) return auth;
+  const annotation = await assertAnnotationInTeam(existing.annotationId, auth.data.team.id);
   if (!annotation) return { success: false, error: "Comment not found." };
 
   const [updated] = await db
@@ -115,6 +117,8 @@ export async function updateComment(
 }
 
 export async function deleteComment(commentId: string): Promise<ActionResult<true>> {
+  if (!isUuid(commentId)) return { success: false, error: "Comment not found." };
+
   const user = await getCurrentUser();
   if (!user) return { success: false, error: "Not signed in." };
 
@@ -128,8 +132,9 @@ export async function deleteComment(commentId: string): Promise<ActionResult<tru
     return { success: false, error: "You can only delete your own comments." };
   }
 
-  const { team } = await requireTeamRole("viewer");
-  const annotation = await assertAnnotationInTeam(existing.annotationId, team.id);
+  const auth = await authorizeTeamRole("viewer");
+  if (!auth.success) return auth;
+  const annotation = await assertAnnotationInTeam(existing.annotationId, auth.data.team.id);
   if (!annotation) return { success: false, error: "Comment not found." };
 
   await db.delete(comments).where(eq(comments.id, commentId));

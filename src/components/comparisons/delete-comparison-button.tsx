@@ -27,7 +27,9 @@ export function DeleteComparisonButton({
       title={`Delete "${comparisonName}"?`}
       description="This removes the comparison. The underlying design and capture assets are kept."
       onConfirm={async () => {
-        await deleteComparison(pageId, comparisonId);
+        const result = await deleteComparison(pageId, comparisonId);
+        // Thrown errors are shown by the dialog, which stays open.
+        if (!result.success) throw new Error(result.error);
         toast.success("Comparison deleted");
         router.push(`/projects/${projectSlug}/${pageId}`);
       }}
