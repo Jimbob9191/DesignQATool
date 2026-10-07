@@ -1,13 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, MessageSquare, PanelRightClose, RotateCcw } from "lucide-react";
+import { Check, MessageSquare, MoreHorizontal, PanelRightClose, RotateCcw, Trash2 } from "lucide-react";
 
 import type { AnnotationStatus } from "@/components/comparison/pin-marker";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { CommentComposer, type TeamMemberOption } from "@/components/comments/comment-composer";
 import { CommentItem, type CommentData } from "@/components/comments/comment-item";
 
@@ -19,6 +30,8 @@ export type AnnotationThread = {
   authorEmail: string;
   /** Extra context, e.g. the pinned element's text on a live site. */
   detail?: string | null;
+  /** Whether the current user may delete this pin (see deleteAnnotation). */
+  canDelete: boolean;
   comments: CommentData[];
 };
 
@@ -28,6 +41,8 @@ const STATUS_LABEL: Record<AnnotationStatus, string> = {
   wont_fix: "Won't fix",
   needs_review: "Needs review",
 };
+
+const STATUSES = Object.keys(STATUS_LABEL) as AnnotationStatus[];
 
 const STATUS_DOT_CLASSES: Record<AnnotationStatus, string> = {
   open: "bg-status-open text-status-open-foreground",
@@ -41,6 +56,7 @@ export function CommentSidebar({
   selectedId,
   onSelect,
   onStatusChange,
+  onDelete,
   teamMembers,
   currentUserId,
   onAddComment,
@@ -52,6 +68,7 @@ export function CommentSidebar({
   selectedId: string | null;
   onSelect: (id: string) => void;
   onStatusChange?: (id: string, status: AnnotationStatus) => void;
+  onDelete?: (id: string) => void;
   teamMembers: TeamMemberOption[];
   currentUserId: string;
   onAddComment: (annotationId: string, body: string) => Promise<void>;
@@ -64,6 +81,12 @@ export function CommentSidebar({
   // edit box (which takes the composer's place until it's saved or cancelled).
   const [editing, setEditing] = useState<{ threadId: string; commentId: string } | null>(null);
   const editingCommentId = editing?.threadId === selectedId ? editing.commentId : null;
+  // The pin awaiting delete confirmation. The dialog lives outside the menu so
+  // it survives the menu closing, and outside the threads so its clicks don't
+  // select one. The pin is kept after closing so the text doesn't blank out
+  // while the dialog animates away.
+  const [confirmingDelete, setConfirmingDelete] = useState<AnnotationThread | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   // Moving to another pin abandons an edit.
   useEffect(() => {
@@ -134,23 +157,61 @@ export function CommentSidebar({
                       <span className="text-xs text-muted-foreground">{STATUS_LABEL[thread.status]}</span>
                     )}
                   </div>
-                  {onStatusChange ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onStatusChange(thread.id, thread.status === "resolved" ? "open" : "resolved");
-                      }}
-                      title={thread.status === "resolved" ? "Reopen" : "Resolve"}
-                    >
-                      {thread.status === "resolved" ? (
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      ) : (
-                        <Check className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                  ) : null}
+                  {/* Menu clicks bubble through the portal to the thread, so stop them here. */}
+                  <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                    {onStatusChange ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onStatusChange(thread.id, thread.status === "resolved" ? "open" : "resolved")}
+                        title={thread.status === "resolved" ? "Reopen" : "Resolve"}
+                      >
+                        {thread.status === "resolved" ? (
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        ) : (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    ) : null}
+                    {onStatusChange || (onDelete && thread.canDelete) ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="ghost" title="More actions">
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          {onStatusChange ? (
+                            <>
+                              <DropdownMenuLabel>Status</DropdownMenuLabel>
+                              <DropdownMenuRadioGroup
+                                value={thread.status}
+                                onValueChange={(value) => onStatusChange(thread.id, value as AnnotationStatus)}
+                              >
+                                {STATUSES.map((status) => (
+                                  <DropdownMenuRadioItem key={status} value={status}>
+                                    {STATUS_LABEL[status]}
+                                  </DropdownMenuRadioItem>
+                                ))}
+                              </DropdownMenuRadioGroup>
+                            </>
+                          ) : null}
+                          {onDelete && thread.canDelete ? (
+                            <>
+                              {onStatusChange ? <DropdownMenuSeparator /> : null}
+                              <DropdownMenuItem variant="destructive" onSelect={() => {
+                                  setConfirmingDelete(thread);
+                                  setConfirmDeleteOpen(true);
+                                }}>
+                                <Trash2 />
+                                Delete pin
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
+                  </div>
                 </div>
                 {thread.detail ? (
                   <p className="mt-1 truncate pl-7 text-xs text-muted-foreground" title={thread.detail}>
@@ -195,6 +256,21 @@ export function CommentSidebar({
           })
         )}
       </ScrollArea>
+      {onDelete ? (
+        <ConfirmDeleteDialog
+          open={confirmDeleteOpen}
+          onOpenChange={setConfirmDeleteOpen}
+          title={`Delete pin ${confirmingDelete?.number ?? ""}?`}
+          description={
+            confirmingDelete && confirmingDelete.comments.length > 0
+              ? `This also deletes its ${confirmingDelete.comments.length} comment${confirmingDelete.comments.length === 1 ? "" : "s"}. This can't be undone.`
+              : "This can't be undone."
+          }
+          onConfirm={async () => {
+            if (confirmingDelete) onDelete(confirmingDelete.id);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

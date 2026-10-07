@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { createAnnotation, updateAnnotationPosition, updateAnnotationStatus } from "@/lib/actions/annotations";
+import {
+  createAnnotation,
+  deleteAnnotation,
+  updateAnnotationPosition,
+  updateAnnotationStatus,
+} from "@/lib/actions/annotations";
 import { createComment } from "@/lib/actions/comments";
 import { setComparisonViaProxy } from "@/lib/actions/comparisons";
 import type { ElementMapEntry } from "@/lib/annotations/hit-test";
@@ -324,6 +329,22 @@ export function ComparisonWorkspace({
     }
   }
 
+  async function handleDelete(id: string) {
+    const index = annotations.findIndex((a) => a.id === id);
+    if (index === -1) return;
+    const before = annotations[index];
+    setAnnotations((prev) => prev.filter((a) => a.id !== id));
+    setSelectedId((prev) => (prev === id ? null : prev));
+    const result = await deleteAnnotation(id);
+    if (!result.success) {
+      toast.error(result.error);
+      // Put it back where it was, unless it has reappeared some other way.
+      setAnnotations((prev) =>
+        prev.some((a) => a.id === id) ? prev : [...prev.slice(0, index), before, ...prev.slice(index)]
+      );
+    }
+  }
+
   async function handleAddComment(annotationId: string, body: string) {
     const tempId = `pending-${Date.now()}`;
     const optimistic: CommentData = {
@@ -400,6 +421,12 @@ export function ComparisonWorkspace({
       status: a.status,
       authorEmail: a.authorEmail,
       detail: live.kind === "site" ? livePinDetail(a, live.url) : null,
+      // Mirrors deleteAnnotation: members+ can delete any pin, anyone their own
+      // while nobody else has replied. A pin still being saved has no real id yet.
+      canDelete:
+        !a.id.startsWith("pending-") &&
+        (canModerate ||
+          (a.authorId === currentUser.id && a.comments.every((c) => c.createdBy === currentUser.id))),
       comments: a.comments,
     }));
 
@@ -409,6 +436,7 @@ export function ComparisonWorkspace({
       selectedId={selectedId}
       onSelect={setSelectedId}
       onStatusChange={canModerate ? handleStatusChange : undefined}
+      onDelete={handleDelete}
       teamMembers={teamMembers}
       currentUserId={currentUser.id}
       onAddComment={handleAddComment}

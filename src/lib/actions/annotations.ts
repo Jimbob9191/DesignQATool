@@ -1,11 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, ne, or } from "drizzle-orm";
 import { z } from "zod";
 
-import { authorizeTeamRole, isUuid, type ActionResult } from "@/lib/actions/result";
-import { getCurrentUser } from "@/lib/auth/team";
+import { authorizeTeamRole, isUuid, NO_PERMISSION, type ActionResult } from "@/lib/actions/result";
+import { getCurrentUser, hasTeamRole } from "@/lib/auth/team";
 import type { ElementMapEntry } from "@/lib/annotations/hit-test";
 import { resolveAnnotationForNewCapture } from "@/lib/annotations/resolve";
 import { db } from "@/lib/db";
@@ -14,6 +14,7 @@ import {
   annotations,
   assets,
   captures,
+  comments,
   comparisons,
   pages,
   projects,
@@ -194,15 +195,22 @@ export async function updateAnnotationStatus(
   return { success: true, data: updated };
 }
 
+/**
+ * Members and up can delete any pin. A viewer can drop pins, so they can also
+ * take back one of their own — but only while the thread is theirs alone, so
+ * a viewer can't wipe out teammates' comments along with it.
+ */
 export async function deleteAnnotation(annotationId: string): Promise<ActionResult<{ id: string }>> {
   if (!isUuid(annotationId)) return { success: false, error: "Annotation not found." };
 
-  const auth = await authorizeTeamRole("member");
+  const auth = await authorizeTeamRole("viewer");
   if (!auth.success) return auth;
-  const { team } = auth.data;
+  const { team, role } = auth.data;
+  const user = await getCurrentUser();
+  if (!user) return { success: false, error: "Not signed in." };
 
   const [existing] = await db
-    .select({ comparisonId: annotations.comparisonId })
+    .select({ comparisonId: annotations.comparisonId, createdBy: annotations.createdBy })
     .from(annotations)
     .where(eq(annotations.id, annotationId))
     .limit(1);
@@ -210,6 +218,23 @@ export async function deleteAnnotation(annotationId: string): Promise<ActionResu
 
   const comparison = await assertComparisonInTeam(existing.comparisonId, team.id);
   if (!comparison) return { success: false, error: "Annotation not found." };
+
+  if (!hasTeamRole(role, "member")) {
+    if (existing.createdBy !== user.id) return { success: false, error: NO_PERMISSION };
+    const [othersComment] = await db
+      .select({ id: comments.id })
+      .from(comments)
+      .where(
+        and(
+          eq(comments.annotationId, annotationId),
+          or(isNull(comments.createdBy), ne(comments.createdBy, user.id))
+        )
+      )
+      .limit(1);
+    if (othersComment) {
+      return { success: false, error: "Others have replied to this pin, so only a member can delete it." };
+    }
+  }
 
   await db.delete(annotations).where(eq(annotations.id, annotationId));
 

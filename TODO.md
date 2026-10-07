@@ -23,17 +23,6 @@ Nothing open.
 
 ## P2 — real improvements
 
-### [ ] 10. Delete pins, and set every pin status from the sidebar
-**P2 · S–M · Touches:** `src/components/comments/comment-sidebar.tsx`, `src/components/comparison/comparison-workspace.tsx`, `src/lib/actions/annotations.ts`
-
-**Problem:** `deleteAnnotation` exists but nothing calls it, so a misplaced pin can't be removed. The sidebar only toggles open/resolved (`comment-sidebar.tsx:119-135`), even though the data model also has `wont_fix` and `needs_review`. "Needs review" pins (from re-resolution) can only be cleared by resolving them.
-
-**Do:** add a small per-thread menu (`DropdownMenu`) for members and up: set the status to any of the four values, and "Delete pin" behind a confirm. Allow the pin's author to delete their own pin even as a viewer, if that fits the role model; otherwise members+ only. Use the same server-side rule. Update the workspace state optimistically and roll back on error.
-
-**Done when:** pins can be deleted and moved to any status, and other viewers see the change live (task 4 handles delete sync).
-
----
-
 ### [ ] 11. Edit an existing comparison
 **P2 · M · Touches:** `src/lib/actions/comparisons.ts`, new `src/components/comparisons/edit-comparison-dialog.tsx` (or generalise `create-comparison-dialog.tsx`), compare page header
 

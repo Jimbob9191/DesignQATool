@@ -16,7 +16,10 @@ import {
 } from "@/components/ui/alert-dialog";
 
 type ConfirmDeleteDialogProps = {
-  trigger: React.ReactNode;
+  /** Omit to control the dialog with `open`/`onOpenChange`, e.g. from a menu item. */
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   title: string;
   description: string;
   onConfirm: () => Promise<void>;
@@ -24,11 +27,18 @@ type ConfirmDeleteDialogProps = {
 
 export function ConfirmDeleteDialog({
   trigger,
+  open: controlledOpen,
+  onOpenChange,
   title,
   description,
   onConfirm,
 }: ConfirmDeleteDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  function setOpen(next: boolean) {
+    setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  }
   const [isPending, startTransition] = useTransition();
 
   function handleConfirm() {
@@ -44,7 +54,7 @@ export function ConfirmDeleteDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
+      {trigger ? <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger> : null}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
