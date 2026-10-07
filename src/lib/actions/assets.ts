@@ -8,7 +8,11 @@ import { getCurrentUser } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { assets, pages, projects } from "@/lib/db/schema";
 import { ASSETS_BUCKET, createAdminClient } from "@/lib/supabase/admin";
-import { confirmUploadSchema, requestUploadUrlSchema } from "@/lib/validations/asset";
+import {
+  confirmUploadSchema,
+  renameAssetSchema,
+  requestUploadUrlSchema,
+} from "@/lib/validations/asset";
 
 function extensionFor(mime: string): string {
   switch (mime) {
@@ -106,6 +110,7 @@ export async function confirmUpload(input: unknown): Promise<ActionResult<{ id: 
       pageId: parsed.data.pageId,
       kind: "design",
       storagePath: parsed.data.storagePath,
+      name: parsed.data.filename,
       width: parsed.data.width,
       height: parsed.data.height,
       mime: parsed.data.mime,
@@ -168,6 +173,30 @@ export async function setAssetPage(
     .update(assets)
     .set({ pageId })
     .where(and(eq(assets.id, assetId), eq(assets.teamId, team.id)))
+    .returning({ id: assets.id });
+
+  if (!asset) {
+    return { success: false, error: "Asset not found." };
+  }
+
+  revalidatePath("/assets");
+  return { success: true, data: asset };
+}
+
+export async function renameAsset(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const parsed = renameAssetSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const auth = await authorizeTeamRole("member");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
+
+  const [asset] = await db
+    .update(assets)
+    .set({ name: parsed.data.name })
+    .where(and(eq(assets.id, parsed.data.assetId), eq(assets.teamId, team.id)))
     .returning({ id: assets.id });
 
   if (!asset) {

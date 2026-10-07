@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  check,
   index,
   integer,
   pgEnum,
@@ -35,6 +36,10 @@ export const assets = pgTable(
     pageId: uuid("page_id").references(() => pages.id, { onDelete: "set null" }),
     kind: assetKindEnum("kind").notNull(),
     storagePath: text("storage_path").notNull(),
+    // What people call the file: the original upload's filename, renamable.
+    // Null for rows from before names were kept, and for captures — show
+    // those with assetDisplayName(), which falls back to the storage basename.
+    name: text("name"),
     width: integer("width"),
     height: integer("height"),
     mime: text("mime").notNull(),
@@ -46,6 +51,11 @@ export const assets = pgTable(
   (table) => [
     index("assets_team_id_created_at_idx").on(table.teamId, table.createdAt),
     index("assets_page_id_created_at_idx").on(table.pageId, table.createdAt),
+    // Mirrors assetNameSchema, since RLS lets members update rows directly.
+    check(
+      "assets_name_length",
+      sql`${table.name} is null or char_length(btrim(${table.name})) between 1 and 255`
+    ),
     pgPolicy("assets_select_team_member", {
       for: "select",
       to: authenticatedRole,

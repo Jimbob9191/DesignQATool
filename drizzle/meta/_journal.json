@@ -162,6 +162,13 @@
       "when": 1791284526393,
       "tag": "0022_fk_and_filter_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791384892131,
+      "tag": "0023_asset_names",
+      "breakpoints": true
     }
   ]
 }

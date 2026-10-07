@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { GitCompare } from "lucide-react";
+import { GitCompare, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { createComparison } from "@/lib/actions/comparisons";
@@ -30,6 +30,7 @@ import {
 type DesignOption = {
   id: string;
   label: string;
+  thumbnailUrl: string | null;
   width: number | null;
   /** Where a design from elsewhere in the team comes from, e.g. "from Home". */
   note: string | null;
@@ -135,13 +136,23 @@ export function CreateComparisonDialog({
                 <SelectContent>
                   {designOptions.map((option) => (
                     <SelectItem key={option.id} value={option.id}>
-                      {option.label}
-                      {option.width ? (
-                        <span className="text-muted-foreground"> — {option.width}px</span>
-                      ) : null}
-                      {option.note ? (
-                        <span className="text-muted-foreground"> ({option.note})</span>
-                      ) : null}
+                      <span className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted">
+                        {option.thumbnailUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URLs
+                          <img src={option.thumbnailUrl} alt="" className="size-full object-cover" />
+                        ) : (
+                          <ImageIcon className="size-3.5 text-muted-foreground" />
+                        )}
+                      </span>
+                      <span className="min-w-0 truncate">
+                        {option.label}
+                        {option.width ? (
+                          <span className="text-muted-foreground"> — {option.width}px</span>
+                        ) : null}
+                        {option.note ? (
+                          <span className="text-muted-foreground"> ({option.note})</span>
+                        ) : null}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

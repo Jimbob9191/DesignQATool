@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { getCurrentTeam } from "@/lib/auth/team";
+import { assetDisplayName } from "@/lib/assets/name";
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import { getAssetComparisonNames } from "@/lib/assets/usage";
 import { db } from "@/lib/db";
@@ -82,7 +83,7 @@ export default async function AssetsPage({
               asset={{
                 id: asset.id,
                 kind: asset.kind,
-                storagePath: asset.storagePath,
+                name: assetDisplayName(asset),
                 width: asset.width,
                 height: asset.height,
                 pageId: asset.pageId,

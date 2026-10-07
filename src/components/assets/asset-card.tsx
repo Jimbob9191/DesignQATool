@@ -15,12 +15,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
-import { Trash2 } from "lucide-react";
+import { RenameAssetDialog } from "@/components/assets/rename-asset-dialog";
+import { Pencil, Trash2 } from "lucide-react";
 
 export type AssetCardData = {
   id: string;
   kind: "design" | "capture";
-  storagePath: string;
+  /** From assetDisplayName(), so never empty. */
+  name: string;
   width: number | null;
   height: number | null;
   pageId: string | null;
@@ -62,7 +64,6 @@ export function AssetCard({
   canEdit?: boolean;
 }) {
   const router = useRouter();
-  const filename = asset.storagePath.split("/").pop() ?? asset.storagePath;
 
   async function handlePageChange(value: string) {
     const result = await setAssetPage(asset.id, value === "unassigned" ? null : value);
@@ -80,7 +81,7 @@ export function AssetCard({
           // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URLs; next/image's remote-pattern allowlist doesn't fit
           <img
             src={asset.signedUrl}
-            alt={filename}
+            alt={asset.name}
             className="h-full w-full object-contain"
             loading="lazy"
           />
@@ -90,8 +91,8 @@ export function AssetCard({
       </div>
       <div className="flex flex-col gap-2 p-3">
         <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-sm font-medium" title={filename}>
-            {filename}
+          <p className="truncate text-sm font-medium" title={asset.name}>
+            {asset.name}
           </p>
           <Badge variant="outline" className="shrink-0 capitalize">
             {asset.kind}
@@ -122,23 +123,35 @@ export function AssetCard({
         </Select>
 
         {canEdit ? (
-          <ConfirmDeleteDialog
-            trigger={
-              <Button variant="outline" size="sm" className="w-full text-destructive">
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete
-              </Button>
-            }
-            title={`Delete "${filename}"?`}
-            description={deleteDescription(asset.comparisonNames)}
-            onConfirm={async () => {
-              const result = await deleteAsset(asset.id);
-              // Thrown errors are shown by the dialog, which stays open.
-              if (!result.success) throw new Error(result.error);
-              toast.success("Asset deleted");
-              router.refresh();
-            }}
-          />
+          <div className="grid grid-cols-2 gap-2">
+            <RenameAssetDialog
+              assetId={asset.id}
+              currentName={asset.name}
+              trigger={
+                <Button variant="outline" size="sm">
+                  <Pencil className="h-3.5 w-3.5" />
+                  Rename
+                </Button>
+              }
+            />
+            <ConfirmDeleteDialog
+              trigger={
+                <Button variant="outline" size="sm" className="text-destructive">
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </Button>
+              }
+              title={`Delete "${asset.name}"?`}
+              description={deleteDescription(asset.comparisonNames)}
+              onConfirm={async () => {
+                const result = await deleteAsset(asset.id);
+                // Thrown errors are shown by the dialog, which stays open.
+                if (!result.success) throw new Error(result.error);
+                toast.success("Asset deleted");
+                router.refresh();
+              }}
+            />
+          </div>
         ) : null}
       </div>
     </Card>

@@ -1,0 +1,2 @@
+ALTER TABLE "assets" ADD COLUMN "name" text;--> statement-breakpoint
+ALTER TABLE "assets" ADD CONSTRAINT "assets_name_length" CHECK ("assets"."name" is null or char_length(btrim("assets"."name")) between 1 and 255);
