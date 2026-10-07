@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { GitCompare, ImageIcon } from "lucide-react";
+import { GitCompare } from "lucide-react";
 import { toast } from "sonner";
 
 import { createComparison } from "@/lib/actions/comparisons";
-import { guessViewportWidth, VIEWPORT_PRESETS } from "@/lib/live/viewports";
+import { guessViewportWidth } from "@/lib/live/viewports";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,22 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-type DesignOption = {
-  id: string;
-  label: string;
-  thumbnailUrl: string | null;
-  width: number | null;
-  /** Where a design from elsewhere in the team comes from, e.g. "from Home". */
-  note: string | null;
-};
+import { DesignSelect, ViewportSelect, type DesignOption } from "@/components/comparisons/comparison-fields";
 
 export function CreateComparisonDialog({
   projectSlug,
@@ -129,34 +114,7 @@ export function CreateComparisonDialog({
                 No designs yet — upload one on this page first, then come back here.
               </p>
             ) : (
-              <Select value={designAssetId} onValueChange={handleDesignChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a design upload" />
-                </SelectTrigger>
-                <SelectContent>
-                  {designOptions.map((option) => (
-                    <SelectItem key={option.id} value={option.id}>
-                      <span className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted">
-                        {option.thumbnailUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URLs
-                          <img src={option.thumbnailUrl} alt="" className="size-full object-cover" />
-                        ) : (
-                          <ImageIcon className="size-3.5 text-muted-foreground" />
-                        )}
-                      </span>
-                      <span className="min-w-0 truncate">
-                        {option.label}
-                        {option.width ? (
-                          <span className="text-muted-foreground"> — {option.width}px</span>
-                        ) : null}
-                        {option.note ? (
-                          <span className="text-muted-foreground"> ({option.note})</span>
-                        ) : null}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <DesignSelect options={designOptions} value={designAssetId} onChange={handleDesignChange} />
             )}
           </div>
 
@@ -172,18 +130,7 @@ export function CreateComparisonDialog({
 
           <div className="flex flex-col gap-1.5">
             <Label>Viewport width</Label>
-            <Select value={String(viewportWidth)} onValueChange={(v) => handleViewportChange(Number(v))}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {VIEWPORT_PRESETS.map((preset) => (
-                  <SelectItem key={preset.width} value={String(preset.width)}>
-                    {preset.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ViewportSelect value={viewportWidth} onChange={handleViewportChange} />
             <p className="text-xs text-muted-foreground">
               Picked from the design&rsquo;s width (allowing for @2x/@3x exports).
             </p>
