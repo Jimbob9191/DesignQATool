@@ -6,6 +6,7 @@ import { authUsers } from "drizzle-orm/supabase";
 import { ArrowLeft } from "lucide-react";
 
 import { getAppOrigin } from "@/lib/app-origin";
+import { assetDisplayName } from "@/lib/assets/name";
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import type { ElementMapEntry } from "@/lib/annotations/hit-test";
 import { getCurrentUser, getCurrentTeam, redirectToOwningTeam } from "@/lib/auth/team";
@@ -28,6 +29,7 @@ import { proxyOriginFor } from "@/lib/live/proxy";
 import { Button } from "@/components/ui/button";
 import { ComparisonWorkspace, type WorkspaceLiveSide } from "@/components/comparison/comparison-workspace";
 import { DeleteComparisonButton } from "@/components/comparisons/delete-comparison-button";
+import { EditComparisonDialog } from "@/components/comparisons/edit-comparison-dialog";
 import { ExportPdfButton } from "@/components/comparisons/export-pdf-button";
 import { RefreshCaptureButton } from "@/components/comparisons/refresh-capture-button";
 import { ShareLinkDialog } from "@/components/comparisons/share-link-dialog";
@@ -98,6 +100,7 @@ export default async function ComparisonDetailPage({
     commentRows,
     teamMemberRows,
     shareLinkRows,
+    designRows,
   ] = await Promise.all([
     capture
       ? db
@@ -141,6 +144,15 @@ export default async function ComparisonDetailPage({
       .from(shareLinks)
       .where(eq(shareLinks.comparisonId, comparisonId))
       .orderBy(desc(shareLinks.createdAt)),
+    // Any of the team's designs can be swapped in, as when creating one.
+    canEdit
+      ? db
+          .select({ id: assets.id, name: assets.name, storagePath: assets.storagePath, width: assets.width, pageId: assets.pageId, pageName: pages.name })
+          .from(assets)
+          .leftJoin(pages, eq(assets.pageId, pages.id))
+          .where(and(eq(assets.teamId, team.id), eq(assets.kind, "design")))
+          .orderBy(desc(assets.createdAt))
+      : [],
   ]);
 
   const designUrl = signedUrls.get(row.design.storagePath);
@@ -178,6 +190,22 @@ export default async function ComparisonDetailPage({
   }));
 
   const teamMemberOptions = teamMemberRows.map((m) => ({ id: m.userId, email: m.email ?? "unknown" }));
+
+  // This page's designs first, then the rest of the team's.
+  const designThumbnailUrls = await getAssetSignedUrls(
+    designRows.map((a) => a.storagePath),
+    { thumbnail: true }
+  );
+  const designOptions = [
+    ...designRows.filter((a) => a.pageId === pageId),
+    ...designRows.filter((a) => a.pageId !== pageId),
+  ].map((a) => ({
+    id: a.id,
+    label: assetDisplayName(a),
+    thumbnailUrl: designThumbnailUrls.get(a.storagePath) ?? null,
+    width: a.width,
+    note: a.pageId === pageId ? null : a.pageName ? `from ${a.pageName}` : "not on a page yet",
+  }));
 
   const origin = await getAppOrigin();
   const shareLinkOptions = shareLinkRows.map((link) => ({
@@ -234,6 +262,22 @@ export default async function ComparisonDetailPage({
             />
           ) : null}
           <ExportPdfButton comparisonId={comparisonId} comparisonName={row.comparison.name} />
+          {canEdit ? (
+            <EditComparisonDialog
+              comparisonId={comparisonId}
+              current={{
+                name: row.comparison.name,
+                designAssetId: row.design.id,
+                live: capture
+                  ? null
+                  : { url: row.comparison.liveUrl!, viewportWidth: row.comparison.viewportWidth! },
+              }}
+              designOptions={designOptions}
+              designPinCount={initialAnnotations.filter((a) => a.target === "design").length}
+              sitePinCount={initialAnnotations.filter((a) => a.target === "live").length}
+              trigger={<Button variant="outline">Edit</Button>}
+            />
+          ) : null}
           {canEdit ? (
             <DeleteComparisonButton
               projectSlug={projectSlug}

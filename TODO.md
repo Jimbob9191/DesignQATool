@@ -23,17 +23,6 @@ Nothing open.
 
 ## P2 — real improvements
 
-### [ ] 11. Edit an existing comparison
-**P2 · M · Touches:** `src/lib/actions/comparisons.ts`, new `src/components/comparisons/edit-comparison-dialog.tsx` (or generalise `create-comparison-dialog.tsx`), compare page header
-
-**Problem:** Once a comparison is created, its name, live URL and viewport width can't be changed, and neither can the design it's set against. The only fix is to delete it, which loses every pin and comment.
-
-**Do:** add `updateComparison(comparisonId, input)` with the same validation as create and a team-scoped check. Add an "Edit" button (member+) next to "Delete comparison". Changing the design or viewport moves design-pane pins. Either warn in the dialog, or only allow swapping to a design of the same width.
-
-**Done when:** all four fields can be edited, and the page revalidates.
-
----
-
 ### [ ] 12. Team settings: rename and delete a team
 **P2 · M · Touches:** `src/lib/actions/teams.ts`, `src/app/(app)/team/page.tsx`, new team-settings component
 
