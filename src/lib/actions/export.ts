@@ -1,23 +1,13 @@
 "use server";
 
-import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 
 import { authorizeTeamRole, isUuid, type ActionResult } from "@/lib/actions/result";
+import { getAppOrigin } from "@/lib/app-origin";
 import { env } from "@/lib/env";
 import { signComparisonExport } from "@/lib/exports/sign";
 import { db } from "@/lib/db";
 import { comparisons, pages, projects } from "@/lib/db/schema";
-
-async function resolveOrigin(): Promise<string> {
-  const headersList = await headers();
-  const host = headersList.get("host");
-  if (!host) {
-    return env.NEXT_PUBLIC_SITE_URL;
-  }
-  const protocol = headersList.get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https");
-  return `${protocol}://${host}`;
-}
 
 export async function exportComparisonPdf(
   comparisonId: string
@@ -47,7 +37,7 @@ export async function exportComparisonPdf(
     return { success: false, error: "Comparison not found." };
   }
 
-  const origin = await resolveOrigin();
+  const origin = await getAppOrigin();
   const { expires, signature } = signComparisonExport(comparisonId);
   const printUrl = `${origin}/print/comparison/${comparisonId}?expires=${expires}&sig=${signature}`;
 

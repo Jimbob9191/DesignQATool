@@ -17,14 +17,7 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 
 ## P1 — bugs, data loss, security
 
-### [ ] 8. Stop building absolute URLs from the request's Host header
-**P1 · S · Touches:** `src/lib/actions/export.ts`, `src/lib/actions/share-links.ts`, `src/app/(app)/projects/[projectSlug]/[pageId]/page.tsx`, `src/app/(app)/projects/[projectSlug]/[pageId]/compare/[comparisonId]/page.tsx`, new `src/lib/origin.ts`
-
-**Problem:** The same "host + x-forwarded-proto" origin logic is copy-pasted four times (`export.ts:12`, `share-links.ts:19`, `[pageId]/page.tsx:98-103`, `compare/page.tsx:174-179`). It's used to build share-link URLs, the bridge snippet, and the print URL that capture-service fetches. Off Vercel, or behind a misconfigured proxy, a spoofed `Host` changes those URLs.
-
-**Do:** add one `getAppOrigin()` helper. In production it should return `env.NEXT_PUBLIC_SITE_URL`, unless the request host is on an explicit allowlist: the site URL's host, `VERCEL_URL` / `VERCEL_BRANCH_URL` for previews, and localhost in dev. Otherwise it falls back to the site URL. Replace all four copies with it.
-
-**Done when:** there's one implementation, and it has a unit test covering allowlisted, preview, and spoofed hosts.
+Nothing open.
 
 ---
 

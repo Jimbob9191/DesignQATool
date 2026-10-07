@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { authUsers } from "drizzle-orm/supabase";
 import { ArrowLeft } from "lucide-react";
 
+import { getAppOrigin } from "@/lib/app-origin";
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import type { ElementMapEntry } from "@/lib/annotations/hit-test";
 import { getCurrentUser, getCurrentTeam, redirectToOwningTeam } from "@/lib/auth/team";
@@ -22,7 +22,6 @@ import {
   shareLinks,
   teamMembers,
 } from "@/lib/db/schema";
-import { env } from "@/lib/env";
 import type { Rect } from "@/lib/live/protocol";
 import { bridgeSnippet } from "@/lib/live/protocol";
 import { proxyOriginFor } from "@/lib/live/proxy";
@@ -180,12 +179,7 @@ export default async function ComparisonDetailPage({
 
   const teamMemberOptions = teamMemberRows.map((m) => ({ id: m.userId, email: m.email ?? "unknown" }));
 
-  const headersList = await headers();
-  const host = headersList.get("host");
-  const protocol =
-    headersList.get("x-forwarded-proto") ??
-    (host?.startsWith("localhost") || host?.startsWith("127.0.0.1") ? "http" : "https");
-  const origin = host ? `${protocol}://${host}` : env.NEXT_PUBLIC_SITE_URL;
+  const origin = await getAppOrigin();
   const shareLinkOptions = shareLinkRows.map((link) => ({
     id: link.id,
     url: `${origin}/share/${link.token}`,
