@@ -23,17 +23,6 @@ Nothing open.
 
 ## P2 — real improvements
 
-### [ ] 9. 🗄️ Keep the original filename of uploads (and allow renaming)
-**P2 · M · Touches:** `src/lib/db/schema/assets.ts`, migration, `src/lib/actions/assets.ts`, `src/lib/validations/asset.ts`, `src/components/assets/asset-card.tsx`, `src/components/comparisons/create-comparison-dialog.tsx`, `src/app/(app)/projects/[projectSlug]/[pageId]/page.tsx`, `src/lib/search/*` (optional)
-
-**Problem:** `requestUploadUrl` receives `filename`, but nothing stores it (`assets.ts:43-73`). Storage paths are `<team>/<uuid>.png`, so asset cards and the "New comparison" design picker label everything with a UUID (`asset-card.tsx:42`, `[pageId]/page.tsx:86,92`). On a real project, picking the right design is guesswork.
-
-**Do:** add a nullable `name text` column (max 255). Save the trimmed original filename in `confirmUpload`, and fall back to the storage basename for old rows. Show `name` everywhere a filename is shown today. Add a "Rename" action on the asset card (member+). Optionally show a thumbnail next to each option in the comparison design picker.
-
-**Done when:** newly uploaded designs show their real filenames in the assets grid, the page detail, and the comparison picker.
-
----
-
 ### [ ] 10. Delete pins, and set every pin status from the sidebar
 **P2 · S–M · Touches:** `src/components/comments/comment-sidebar.tsx`, `src/components/comparison/comparison-workspace.tsx`, `src/lib/actions/annotations.ts`
 

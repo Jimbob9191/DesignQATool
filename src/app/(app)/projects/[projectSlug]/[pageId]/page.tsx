@@ -4,6 +4,7 @@ import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
 import { AlertCircle, Clock, GitCompare } from "lucide-react";
 
 import { getAppOrigin } from "@/lib/app-origin";
+import { assetDisplayName } from "@/lib/assets/name";
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import { getAssetComparisonNames } from "@/lib/assets/usage";
 import { getCurrentTeam, redirectToOwningTeam } from "@/lib/auth/team";
@@ -53,7 +54,13 @@ export default async function PageDetailPage({
       .orderBy(desc(assets.createdAt)),
     // The rest of the team's designs can be compared here too.
     db
-      .select({ id: assets.id, storagePath: assets.storagePath, width: assets.width, pageName: pages.name })
+      .select({
+        id: assets.id,
+        name: assets.name,
+        storagePath: assets.storagePath,
+        width: assets.width,
+        pageName: pages.name,
+      })
       .from(assets)
       .leftJoin(pages, eq(assets.pageId, pages.id))
       .where(and(eq(assets.teamId, team.id), eq(assets.kind, "design"), or(isNull(assets.pageId), ne(assets.pageId, pageId))))
@@ -66,13 +73,20 @@ export default async function PageDetailPage({
       .orderBy(desc(comparisons.createdAt)),
   ]);
 
-  const [signedUrls, comparisonThumbnailUrls, comparisonNames] = await Promise.all([
+  const [signedUrls, thumbnailUrls, comparisonNames] = await Promise.all([
     getAssetSignedUrls([
       ...pageCaptures.filter((c) => c.capture.status === "ready").map((c) => c.asset.storagePath),
       ...designAssets.map((a) => a.storagePath),
     ]),
+    // Also feeds the design picker's thumbnails, so it covers every option.
     getAssetSignedUrls(
-      pageComparisons.map(({ designAsset }) => designAsset.storagePath),
+      [
+        ...new Set([
+          ...pageComparisons.map(({ designAsset }) => designAsset.storagePath),
+          ...designAssets.map((a) => a.storagePath),
+          ...otherDesigns.map((a) => a.storagePath),
+        ]),
+      ],
       { thumbnail: true },
     ),
     getAssetComparisonNames(designAssets.map((a) => a.id)),
@@ -85,13 +99,15 @@ export default async function PageDetailPage({
   const designOptions = [
     ...designAssets.map((a) => ({
       id: a.id,
-      label: a.storagePath.split("/").pop() ?? a.id,
+      label: assetDisplayName(a),
+      thumbnailUrl: thumbnailUrls.get(a.storagePath) ?? null,
       width: a.width,
       note: null,
     })),
     ...otherDesigns.map((a) => ({
       id: a.id,
-      label: a.storagePath.split("/").pop() ?? a.id,
+      label: assetDisplayName(a),
+      thumbnailUrl: thumbnailUrls.get(a.storagePath) ?? null,
       width: a.width,
       note: a.pageName ? `from ${a.pageName}` : "not on a page yet",
     })),
@@ -133,7 +149,7 @@ export default async function PageDetailPage({
                   asset={{
                     id: asset.id,
                     kind: asset.kind,
-                    storagePath: asset.storagePath,
+                    name: assetDisplayName(asset),
                     width: asset.width,
                     height: asset.height,
                     pageId: asset.pageId,
@@ -189,10 +205,10 @@ export default async function PageDetailPage({
                 className="flex items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted"
               >
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
-                  {comparisonThumbnailUrls.get(designAsset.storagePath) ? (
+                  {thumbnailUrls.get(designAsset.storagePath) ? (
                     // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URLs
                     <img
-                      src={comparisonThumbnailUrls.get(designAsset.storagePath)}
+                      src={thumbnailUrls.get(designAsset.storagePath)}
                       alt=""
                       className="h-full w-full object-cover"
                       loading="lazy"

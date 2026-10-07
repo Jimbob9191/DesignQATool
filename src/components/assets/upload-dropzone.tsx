@@ -71,6 +71,7 @@ export function UploadDropzone({ defaultPageId = null }: { defaultPageId?: strin
       const confirmResult = await confirmUpload({
         assetId,
         storagePath,
+        filename: file.name,
         pageId: defaultPageId,
         mime: file.type,
         width: dimensions?.width ?? null,
