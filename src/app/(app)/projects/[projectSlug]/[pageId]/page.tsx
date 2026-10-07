@@ -1,15 +1,14 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
 import { AlertCircle, Clock, GitCompare } from "lucide-react";
 
+import { getAppOrigin } from "@/lib/app-origin";
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import { getAssetComparisonNames } from "@/lib/assets/usage";
 import { getCurrentTeam, redirectToOwningTeam } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { assets, captures, comparisons, pages, projects } from "@/lib/db/schema";
-import { env } from "@/lib/env";
 import { bridgeSnippet } from "@/lib/live/protocol";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -98,12 +97,7 @@ export default async function PageDetailPage({
     })),
   ];
 
-  const headersList = await headers();
-  const host = headersList.get("host");
-  const protocol =
-    headersList.get("x-forwarded-proto") ??
-    (host?.startsWith("localhost") || host?.startsWith("127.0.0.1") ? "http" : "https");
-  const snippet = bridgeSnippet(host ? `${protocol}://${host}` : env.NEXT_PUBLIC_SITE_URL);
+  const snippet = bridgeSnippet(await getAppOrigin());
 
   return (
     <div className="flex flex-col gap-6">

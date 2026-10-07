@@ -2,28 +2,18 @@
 
 import { randomBytes } from "node:crypto";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { authorizeTeamRole, isUuid, type ActionResult } from "@/lib/actions/result";
+import { getAppOrigin } from "@/lib/app-origin";
 import { getCurrentUser } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { annotations, comments, comparisons, pages, projects, shareLinks } from "@/lib/db/schema";
-import { env } from "@/lib/env";
 import { notifyCommentParticipants } from "@/lib/notifications/notify";
 import { clientIp, consumeRateLimits } from "@/lib/rate-limit";
-
-async function resolveOrigin(): Promise<string> {
-  const headersList = await headers();
-  const host = headersList.get("host");
-  if (!host) return env.NEXT_PUBLIC_SITE_URL;
-  const protocol =
-    headersList.get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https");
-  return `${protocol}://${host}`;
-}
 
 async function assertComparisonInTeam(comparisonId: string, teamId: string) {
   const [row] = await db
@@ -72,7 +62,7 @@ export async function createShareLink(
   revalidatePath(
     `/projects/${comparison.projectSlug}/${comparison.pageId}/compare/${parsed.data.comparisonId}`
   );
-  const origin = await resolveOrigin();
+  const origin = await getAppOrigin();
   return { success: true, data: { url: `${origin}/share/${token}` } };
 }
 
