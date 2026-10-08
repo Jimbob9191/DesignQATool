@@ -17,8 +17,8 @@ const ROLE_RANK: Record<TeamRole, number> = { viewer: 0, member: 1, admin: 2, ow
 export const CURRENT_TEAM_COOKIE = "current_team_id";
 
 // Only callable from a Server Action or Route Handler (switchTeam(),
-// createTeam(), acceptInvitation() and the /switch-team route): Server
-// Components can't write cookies during render.
+// createTeam(), deleteTeam(), acceptInvitation() and the /switch-team route):
+// Server Components can't write cookies during render.
 export async function setCurrentTeamCookie(teamId: string) {
   const cookieStore = await cookies();
   cookieStore.set(CURRENT_TEAM_COOKIE, teamId, {
@@ -27,6 +27,11 @@ export async function setCurrentTeamCookie(teamId: string) {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
   });
+}
+
+export async function clearCurrentTeamCookie() {
+  const cookieStore = await cookies();
+  cookieStore.delete(CURRENT_TEAM_COOKIE);
 }
 
 export type CurrentUser = { id: string; email: string | undefined };

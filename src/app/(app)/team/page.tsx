@@ -1,14 +1,15 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 import { authUsers } from "drizzle-orm/supabase";
 
-import { getCurrentTeam } from "@/lib/auth/team";
+import { getCurrentTeam, getUserTeams } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { invitations, teamMembers } from "@/lib/db/schema";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InviteMemberDialog } from "@/components/team/invite-member-dialog";
 import { InvitationRow } from "@/components/team/invitation-row";
 import { MemberRow } from "@/components/team/member-row";
 import { LeaveTeamButton } from "@/components/team/leave-team-button";
+import { DeleteTeamButton, RenameTeamForm } from "@/components/team/team-settings";
 import { Button } from "@/components/ui/button";
 import { UserPlus } from "lucide-react";
 
@@ -16,7 +17,7 @@ export default async function TeamPage() {
   const { team, role } = await getCurrentTeam();
   const canManage = role === "owner" || role === "admin";
 
-  const [members, pendingInvitations] = await Promise.all([
+  const [members, pendingInvitations, memberships] = await Promise.all([
     db
       .select({ userId: teamMembers.userId, role: teamMembers.role, email: authUsers.email })
       .from(teamMembers)
@@ -30,7 +31,10 @@ export default async function TeamPage() {
           .where(and(eq(invitations.teamId, team.id), eq(invitations.status, "pending")))
           .orderBy(desc(invitations.createdAt))
       : [],
+    getUserTeams(),
   ]);
+  // deleteTeam refuses to delete the user's only team; mirror that here.
+  const canDeleteTeam = memberships.length > 1;
 
   return (
     <div className="flex flex-col gap-6">
@@ -79,6 +83,33 @@ export default async function TeamPage() {
             {pendingInvitations.map((invitation) => (
               <InvitationRow key={invitation.id} invitation={invitation} />
             ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canManage ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Settings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RenameTeamForm key={team.id} teamName={team.name} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {role === "owner" ? (
+        <Card className="border-destructive/40">
+          <CardHeader>
+            <CardTitle className="text-base">Delete team</CardTitle>
+            <CardDescription>
+              {canDeleteTeam
+                ? "Permanently delete this team, its projects, and all of its uploads."
+                : "This is your only team, so it can’t be deleted."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DeleteTeamButton teamName={team.name} canDelete={canDeleteTeam} />
           </CardContent>
         </Card>
       ) : null}
