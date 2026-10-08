@@ -3,8 +3,10 @@
 import { Columns2, Link2, Link2Off, MoveHorizontal, Rows2, SquareStack, SquaresIntersect } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 export type Layout = "side-by-side" | "stacked" | "single" | "overlay" | "swipe";
 
@@ -22,12 +24,14 @@ export function LayoutTabs({ value, onValueChange }: { value: Layout; onValueCha
     <Tabs value={value} onValueChange={(v) => onValueChange(v as Layout)}>
       <TabsList>
         {LAYOUTS.map(({ value, label, icon: Icon }) => (
+          // The tab wraps the tooltip's trigger, not the other way round, so the
+          // tooltip's open/closed state doesn't overwrite the tab's active state.
           <Tooltip key={value}>
-            <TooltipTrigger asChild>
-              <TabsTrigger value={value} aria-label={label} className="px-2">
+            <TabsTrigger value={value} aria-label={label} className="px-2" asChild>
+              <TooltipTrigger>
                 <Icon className="h-4 w-4" />
-              </TabsTrigger>
-            </TooltipTrigger>
+              </TooltipTrigger>
+            </TabsTrigger>
             <TooltipContent side="bottom">{label}</TooltipContent>
           </Tooltip>
         ))}
@@ -43,9 +47,9 @@ export function SyncToggle({ synced, onSyncedChange }: { synced: boolean; onSync
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
-          variant={synced ? "secondary" : "ghost"}
+          variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className={cn("h-8 w-8", !synced && "text-muted-foreground")}
           aria-label="Scroll panes together"
           aria-pressed={synced}
           onClick={() => onSyncedChange(!synced)}
@@ -56,4 +60,9 @@ export function SyncToggle({ synced, onSyncedChange }: { synced: boolean; onSync
       <TooltipContent side="bottom">{label}</TooltipContent>
     </Tooltip>
   );
+}
+
+/** Divides groups of controls in the top bar. */
+export function ToolbarSeparator() {
+  return <Separator orientation="vertical" className="mx-1 data-vertical:h-5 data-vertical:self-center" />;
 }

@@ -8,7 +8,7 @@ export type Crumb = { label: string; href?: string };
 
 /**
  * Shows the trail in the top bar. The last crumb is the current page; children,
- * if given, stand in for its label, e.g. a menu of actions on the page.
+ * if given, stand in for its label, e.g. a menu for switching to its siblings.
  */
 export function Breadcrumbs({ items, children }: { items: Crumb[]; children?: React.ReactNode }) {
   return (
@@ -19,8 +19,7 @@ export function Breadcrumbs({ items, children }: { items: Crumb[]; children?: Re
             const isLast = index === items.length - 1;
             return (
               // When space runs short the trail truncates before the current page
-              // does, and on small screens only the current page shows; the back
-              // arrow covers the rest.
+              // does, and on small screens only the current page shows.
               <li
                 key={index}
                 className={cn("min-w-0 items-center gap-1.5", isLast ? "flex" : "hidden shrink-[4] md:flex")}

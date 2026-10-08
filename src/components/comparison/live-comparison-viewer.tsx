@@ -19,8 +19,9 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { TopbarPortal } from "@/components/app-shell/topbar-slot";
 import type { AnnotationData, ComparisonImage } from "@/components/comparison/comparison-viewer";
-import { LayoutTabs, SyncToggle, type Layout } from "@/components/comparison/layout-tabs";
+import { LayoutTabs, SyncToggle, ToolbarSeparator, type Layout } from "@/components/comparison/layout-tabs";
 import { matchesPinFilters, type PinFilters } from "@/components/comparison/pin-filters";
 import { ImagePane, type ImagePaneHandle, type PaneTransform } from "@/components/comparison/image-pane";
 import { LivePane, type LivePaneHandle, type LivePick, type LiveTransform } from "@/components/comparison/live-pane";
@@ -63,6 +64,8 @@ export function LiveComparisonViewer({
   onDragAnnotation,
   onViaProxyChange,
   commentPanel,
+  showComments,
+  topbarEnd,
 }: {
   design: ComparisonImage;
   site: LiveSite;
@@ -78,6 +81,10 @@ export function LiveComparisonViewer({
   onViaProxyChange?: (viaProxy: boolean) => void;
   /** Floated over the right edge of the canvas. */
   commentPanel?: React.ReactNode;
+  /** Brings the comment panel back; at the right of the toolbar while it's hidden. */
+  showComments?: React.ReactNode;
+  /** Shown in the top bar after the view controls. */
+  topbarEnd?: React.ReactNode;
 }) {
   const [layout, setLayout] = useState<Layout>("side-by-side");
   const [singlePane, setSinglePane] = useState<PaneId>("live");
@@ -388,62 +395,72 @@ export function LiveComparisonViewer({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Same gutter as the top bar, and the same height while it fits on one line. */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
-        <LayoutTabs value={layout} onValueChange={setLayout} />
-
-        {onCreateLiveAnnotation ? (
-          <Tooltip delayDuration={500}>
-            <TooltipTrigger asChild>
-              <Tabs value={mode} onValueChange={(v) => setMode(v as LiveMode)}>
-                <TabsList>
-                  <TabsTrigger value="comment">
-                    <MessageSquarePlus className="h-4 w-4" />
-                    Comment
-                  </TabsTrigger>
-                  <TabsTrigger value="browse">
-                    <MousePointer2 className="h-4 w-4" />
-                    Browse
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="flex-col items-start gap-1">
-              <p>Comment: click any element on the site, or a spot on the design, to pin it.</p>
-              <p>Browse: use the site normally.</p>
-              <p>Scroll either side to move both. Pinch or ⌘-scroll to zoom the design.</p>
-              <p>Shortcuts: C comment/browse, S sync, F fit design.</p>
-              {useProxy ? <p>Page look wrong? Switch to Direct and add the snippet to the site.</p> : null}
-            </TooltipContent>
-          </Tooltip>
-        ) : null}
-
-        {/* An address bar for the framed site. It takes the room left over and
-            wraps onto its own line rather than squeezing the URL to nothing. */}
-        <div className="flex h-8 min-w-72 flex-1 basis-72 items-center gap-1 overflow-hidden rounded-lg border border-border pr-1 text-xs text-muted-foreground">
-          {site.proxyOrigin && onViaProxyChange ? (
-            <Select
-              value={useProxy ? "proxy" : "direct"}
-              onValueChange={(v) => handleViaProxyChange(v === "proxy")}
-            >
-              <SelectTrigger
-                size="sm"
-                className="h-full shrink-0 gap-1 rounded-none border-0 border-r border-border px-2 text-xs shadow-none dark:bg-transparent"
-                title="How the site is loaded"
-              >
-                <SelectValue>{useProxy ? "Proxy" : "Direct"}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="proxy">Preview proxy — no setup</SelectItem>
-                <SelectItem value="direct">Direct — needs the snippet</SelectItem>
-              </SelectContent>
-            </Select>
-          ) : site.proxyOrigin ? (
-            <span className="flex h-full shrink-0 items-center border-r border-border px-2">
-              {useProxy ? "Proxy" : "Direct"}
-            </span>
+      <TopbarPortal slot="end">
+        <div className="flex items-center gap-1">
+          <LayoutTabs value={layout} onValueChange={setLayout} />
+          {layout === "side-by-side" || layout === "stacked" ? (
+            <SyncToggle synced={syncLocked} onSyncedChange={setSyncLocked} />
           ) : null}
-          <span className="min-w-0 flex-1 truncate pl-2 font-mono text-foreground" title={currentUrl}>
+        </div>
+        {onCreateLiveAnnotation ? (
+          <>
+            <ToolbarSeparator />
+            <Tooltip delayDuration={500}>
+              <TooltipTrigger asChild>
+                <Tabs value={mode} onValueChange={(v) => setMode(v as LiveMode)}>
+                  <TabsList>
+                    <TabsTrigger value="comment">
+                      <MessageSquarePlus className="h-4 w-4" />
+                      Comment
+                    </TabsTrigger>
+                    <TabsTrigger value="browse">
+                      <MousePointer2 className="h-4 w-4" />
+                      Browse
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="flex-col items-start gap-1">
+                <p>Comment: click any element on the site, or a spot on the design, to pin it.</p>
+                <p>Browse: use the site normally.</p>
+                <p>Scroll either side to move both. Pinch or ⌘-scroll to zoom the design.</p>
+                <p>Shortcuts: C comment/browse, S sync, F fit design.</p>
+                {useProxy ? <p>Page look wrong? Switch to Direct and add the snippet to the site.</p> : null}
+              </TooltipContent>
+            </Tooltip>
+          </>
+        ) : null}
+        <ToolbarSeparator />
+        {topbarEnd}
+      </TopbarPortal>
+
+      {/* The address bar is the whole strip: the URL takes the room left over,
+          and any view-specific controls sit at the right end. */}
+      <div className="flex h-10 shrink-0 items-stretch border-b border-border text-xs text-muted-foreground">
+        {site.proxyOrigin && onViaProxyChange ? (
+          <Select
+            value={useProxy ? "proxy" : "direct"}
+            onValueChange={(v) => handleViaProxyChange(v === "proxy")}
+          >
+            <SelectTrigger
+              size="sm"
+              className="h-full shrink-0 gap-1 rounded-none border-0 border-r border-border px-4 text-xs shadow-none data-[size=sm]:h-full data-[size=sm]:rounded-none dark:bg-transparent"
+              title="How the site is loaded"
+            >
+              <SelectValue>{useProxy ? "Proxy" : "Direct"}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="proxy">Preview proxy — no setup</SelectItem>
+              <SelectItem value="direct">Direct — needs the snippet</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : site.proxyOrigin ? (
+          <span className="flex shrink-0 items-center border-r border-border px-4">
+            {useProxy ? "Proxy" : "Direct"}
+          </span>
+        ) : null}
+        <div className={cn("flex min-w-0 flex-1 items-center gap-1 pr-2", site.proxyOrigin ? "pl-3" : "pl-4")}>
+          <span className="min-w-0 flex-1 truncate font-mono text-foreground/70" title={currentUrl}>
             {currentUrl}
           </span>
           {otherPagePins > 0 ? (
@@ -454,7 +471,7 @@ export function LiveComparisonViewer({
           <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono" title="Viewport width">
             {site.viewportWidth}px
           </span>
-          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" asChild>
+          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" asChild>
             <a href={currentUrl} target="_blank" rel="noopener noreferrer" title="Open in a new tab">
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
@@ -462,7 +479,7 @@ export function LiveComparisonViewer({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 shrink-0"
+            className="h-7 w-7 shrink-0"
             onClick={() => liveHandle.current?.reload()}
             title="Reload the site"
           >
@@ -470,33 +487,38 @@ export function LiveComparisonViewer({
           </Button>
         </div>
 
-        {layout === "overlay" ? (
-          <div className="flex w-40 items-center gap-2">
-            <Label className="shrink-0 text-xs text-muted-foreground">Design</Label>
-            <Slider value={[opacity]} onValueChange={([v]) => setOpacity(v)} min={0} max={100} step={1} />
+        {isOverlayLayout || layout === "single" ? (
+          <div className="flex shrink-0 items-center gap-2 border-l border-border px-4">
+            {layout === "overlay" ? (
+              <div className="flex w-40 items-center gap-2">
+                <Label className="shrink-0 text-xs text-muted-foreground">Design</Label>
+                <Slider value={[opacity]} onValueChange={([v]) => setOpacity(v)} min={0} max={100} step={1} />
+              </div>
+            ) : null}
+            {isOverlayLayout ? (
+              <Button
+                variant={blendDifference ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7"
+                onClick={() => setBlendDifference((prev) => !prev)}
+                title="Show the difference between design and site"
+              >
+                <Blend className="h-4 w-4" />
+                Difference
+              </Button>
+            ) : null}
+            {layout === "single" ? (
+              <Tabs value={singlePane} onValueChange={(v) => setSinglePane(v as PaneId)}>
+                <TabsList>
+                  <TabsTrigger value="design">{design.label}</TabsTrigger>
+                  <TabsTrigger value="live">{site.label}</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            ) : null}
           </div>
         ) : null}
-        {isOverlayLayout ? (
-          <Button
-            variant={blendDifference ? "secondary" : "outline"}
-            size="sm"
-            onClick={() => setBlendDifference((prev) => !prev)}
-            title="Show the difference between design and site"
-          >
-            <Blend className="h-4 w-4" />
-            Difference
-          </Button>
-        ) : null}
-        {layout === "single" ? (
-          <Tabs value={singlePane} onValueChange={(v) => setSinglePane(v as PaneId)}>
-            <TabsList>
-              <TabsTrigger value="design">{design.label}</TabsTrigger>
-              <TabsTrigger value="live">{site.label}</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        ) : null}
-        {layout === "side-by-side" || layout === "stacked" ? (
-          <SyncToggle synced={syncLocked} onSyncedChange={setSyncLocked} />
+        {showComments ? (
+          <div className="flex shrink-0 items-center border-l border-border px-2">{showComments}</div>
         ) : null}
       </div>
 
@@ -504,8 +526,6 @@ export function LiveComparisonViewer({
         ref={rootRef}
         className={cn(
           "relative flex min-h-0 flex-1 overflow-hidden",
-          // Room taken on the right by the floating comment panel, or its show button.
-          "[&:has([data-comment-panel=open])]:[--comment-inset:21rem] [&:has([data-comment-panel=closed])]:[--comment-inset:5.5rem]",
           layout === "stacked" ? "flex-col" : "flex-row"
         )}
       >
@@ -523,11 +543,6 @@ export function LiveComparisonViewer({
             className={cn("relative", layout === "single" ? "h-full w-full" : "shrink-0")}
           >
             {designPane}
-            {layout !== "single" ? (
-              <span className="pointer-events-none absolute left-2 top-2 rounded bg-background/80 px-2 py-0.5 text-xs font-medium">
-                {design.label}
-              </span>
-            ) : null}
           </div>
         ) : null}
 
@@ -537,8 +552,11 @@ export function LiveComparisonViewer({
             onPointerMove={handleSplitterPointerMove}
             onPointerUp={handleSplitterPointerUp}
             className={cn(
-              "shrink-0 touch-none bg-border transition-colors hover:bg-primary/50",
-              layout === "side-by-side" ? "w-1 cursor-col-resize" : "h-1 cursor-row-resize"
+              // A 1px rule like the borders above, with a wider strip either side to grab.
+              "relative z-10 shrink-0 touch-none bg-border transition-colors before:absolute before:content-[''] hover:bg-primary/50",
+              layout === "side-by-side"
+                ? "w-px cursor-col-resize before:inset-y-0 before:-inset-x-1.5"
+                : "h-px cursor-row-resize before:inset-x-0 before:-inset-y-1.5"
             )}
           />
         ) : null}

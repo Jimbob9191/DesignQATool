@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Download, Pencil, Share2, Trash2 } from "lucide-react";
+import { Download, Ellipsis, Pencil, Share2, Trash2 } from "lucide-react";
 
 import { useExportPdf } from "@/hooks/use-export-pdf";
 import { Button } from "@/components/ui/button";
@@ -51,13 +51,11 @@ export function ComparisonActionsMenu({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          {/* The trigger is the comparison's breadcrumb, so it carries the name. */}
-          <Button variant="ghost" className="-ml-1 min-w-0 shrink" title="Comparison actions" aria-current="page">
-            <span className="truncate">{comparisonName}</span>
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          <Button variant="ghost" size="icon" className="h-8 w-8" title="Comparison actions" aria-label="Comparison actions">
+            <Ellipsis className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-44">
+        <DropdownMenuContent align="end" className="w-44">
           {canEdit ? (
             <DropdownMenuItem onSelect={() => setOpenDialog("share")}>
               <Share2 />
