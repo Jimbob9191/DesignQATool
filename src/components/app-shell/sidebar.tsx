@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PanelLeftClose, PanelLeftOpen, ScanEye } from "lucide-react";
 
 import { NavLinks } from "@/components/app-shell/nav-links";
+import { SettingsMenu } from "@/components/app-shell/settings-menu";
 import { TeamSwitcher } from "@/components/app-shell/team-switcher";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -15,10 +16,12 @@ export function Sidebar({
   currentTeamId,
   teams,
   defaultCollapsed,
+  userEmail,
 }: {
   currentTeamId: string;
   teams: { id: string; name: string; role: string }[];
   defaultCollapsed: boolean;
+  userEmail: string;
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
@@ -73,6 +76,9 @@ export function Sidebar({
       )}
       <div className={cn("flex-1 overflow-y-auto", collapsed ? "p-2" : "p-3")}>
         <NavLinks collapsed={collapsed} />
+      </div>
+      <div className={cn("border-t border-sidebar-border", collapsed ? "p-2" : "p-3")}>
+        <SettingsMenu userEmail={userEmail} collapsed={collapsed} />
       </div>
     </aside>
   );
