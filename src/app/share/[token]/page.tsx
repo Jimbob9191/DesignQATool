@@ -4,12 +4,13 @@ import { authUsers } from "drizzle-orm/supabase";
 import { ScanEye } from "lucide-react";
 
 import { getAssetSignedUrl } from "@/lib/assets/signed-url";
+import { pinAnchorFor } from "@/lib/live/anchor";
+import type { Rect } from "@/lib/live/protocol";
 import { proxyOriginFor } from "@/lib/live/proxy";
 import { FORMER_MEMBER, guestAuthor } from "@/lib/authors";
 import { db } from "@/lib/db";
 import { annotations, assets, comments, comparisons, pages, projects, shareLinks } from "@/lib/db/schema";
-import { LivePane } from "@/components/comparison/live-pane";
-import { ShareThread } from "@/components/share/share-thread";
+import { SharedComparison, type ShareLiveSide, type SharePin } from "@/components/share/shared-comparison";
 
 export default async function SharePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -50,15 +51,21 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
     row.capture ? getAssetSignedUrl(row.capture.storagePath) : null,
   ]);
 
-  // Guests get the site the same way the team does.
-  let liveFrameUrl = row.comparison.liveUrl;
-  if (liveFrameUrl && row.comparison.liveViaProxy) {
-    const proxyOrigin = await proxyOriginFor(liveFrameUrl);
-    if (proxyOrigin) {
-      const url = new URL(liveFrameUrl);
-      liveFrameUrl = proxyOrigin + url.pathname + url.search + url.hash;
-    }
-  }
+  const { liveUrl, viewportWidth } = row.comparison;
+  const live: ShareLiveSide | null = captureUrl
+    ? {
+        kind: "capture",
+        image: { src: captureUrl, width: row.capture?.width ?? null, height: row.capture?.height ?? null },
+      }
+    : liveUrl && viewportWidth
+      ? {
+          kind: "site",
+          url: liveUrl,
+          viewportWidth,
+          // Guests get the site the same way the team does.
+          proxyOrigin: row.comparison.liveViaProxy ? await proxyOriginFor(liveUrl) : null,
+        }
+      : null;
 
   const annotationRows = await db
     .select({ annotation: annotations })
@@ -77,6 +84,33 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
           .leftJoin(commentAuthor, eq(comments.createdBy, commentAuthor.id))
           .where(inArray(comments.annotationId, annotationIds))
           .orderBy(asc(comments.createdAt));
+
+  const pins: SharePin[] = annotationRows.map(({ annotation: a }, index) => {
+    const xRatio = Number(a.xRatio);
+    return {
+      id: a.id,
+      number: index + 1,
+      status: a.status,
+      target: a.target,
+      xRatio,
+      yPx: a.yPx,
+      pageUrl: a.pageUrl,
+      anchor:
+        a.target === "live" && live?.kind === "site"
+          ? pinAnchorFor(
+              {
+                id: a.id,
+                xRatio,
+                yPx: a.yPx,
+                elementSelector: a.elementSelector,
+                elementRect: a.elementRect as Rect | null,
+                elementText: a.elementText,
+              },
+              live.viewportWidth
+            )
+          : null,
+    };
+  });
 
   const threads = annotationRows.map((r, index) => ({
     id: r.annotation.id,
@@ -113,49 +147,14 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Design</p>
-          {designUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URL
-            <img src={designUrl} alt="Design" className="w-full rounded-md border border-border" />
-          ) : null}
-        </div>
-        <div>
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Live</p>
-          {captureUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URL
-            <img src={captureUrl} alt="Live" className="w-full rounded-md border border-border" />
-          ) : liveFrameUrl && row.comparison.viewportWidth ? (
-            <div className="h-[70vh] overflow-hidden rounded-md border border-border">
-              <LivePane
-                src={liveFrameUrl}
-                viewportWidth={row.comparison.viewportWidth}
-                mode="browse"
-                pins={[]}
-              />
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div>
-        <h2 className="mb-3 text-lg font-medium">Pins ({threads.length})</h2>
-        <div className="flex flex-col gap-3">
-          {threads.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No pins on this comparison.</p>
-          ) : (
-            threads.map((thread) => (
-              <ShareThread
-                key={thread.id}
-                thread={thread}
-                token={token}
-                allowComments={shareLink.allowAnonymousComments}
-              />
-            ))
-          )}
-        </div>
-      </div>
+      <SharedComparison
+        design={designUrl ? { src: designUrl, width: row.design.width, height: row.design.height } : null}
+        live={live}
+        pins={pins}
+        threads={threads}
+        token={token}
+        allowComments={shareLink.allowAnonymousComments}
+      />
     </div>
   );
 }
