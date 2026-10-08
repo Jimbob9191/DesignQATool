@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Columns2, Link2, Link2Off, MoveHorizontal, Rows2, SquareStack, SquaresIntersect } from "lucide-react";
+import { CircleHelp } from "lucide-react";
 
 import type { PanZoomState } from "@/hooks/use-pan-zoom";
 import type { ElementMapEntry } from "@/lib/annotations/hit-test";
@@ -9,15 +9,11 @@ import { hitTestElementMap } from "@/lib/annotations/hit-test";
 import { denormalizeView, normalizeView } from "@/lib/comparison/sync";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ElementHoverHighlight } from "@/components/comparison/element-hover-highlight";
+import { LayoutTabs, SyncToggle, type Layout } from "@/components/comparison/layout-tabs";
+import { matchesPinFilters, NO_PIN_FILTERS, type PinFilters } from "@/components/comparison/pin-filters";
 import { ImagePane, type ImagePaneHandle, type PaneTransform } from "@/components/comparison/image-pane";
 import { OverlayViewer } from "@/components/comparison/overlay-viewer";
 import { PinMarker, type AnnotationStatus } from "@/components/comparison/pin-marker";
@@ -39,7 +35,6 @@ export type AnnotationData = {
   authorEmail: string;
 };
 
-type Layout = "side-by-side" | "stacked" | "single" | "overlay" | "swipe";
 type PaneId = "design" | "live";
 
 const INITIAL_VIEW: PanZoomState = { scale: 1, tx: 0, ty: 0 };
@@ -49,8 +44,7 @@ export function ComparisonViewer({
   live,
   annotations = [],
   selectedAnnotationId = null,
-  statusFilter = "all",
-  actions,
+  filters = NO_PIN_FILTERS,
   onSelectAnnotation,
   onCreateAnnotation,
   onDragAnnotation,
@@ -62,9 +56,7 @@ export function ComparisonViewer({
   annotations?: AnnotationData[];
   selectedAnnotationId?: string | null;
   /** Set from the comment panel. */
-  statusFilter?: AnnotationStatus | "all";
-  /** At the far right of the toolbar. */
-  actions?: React.ReactNode;
+  filters?: PinFilters;
   onSelectAnnotation?: (id: string) => void;
   onCreateAnnotation?: (
     target: PaneId,
@@ -84,8 +76,6 @@ export function ComparisonViewer({
   const [designView, setDesignView] = useState<PanZoomState>(INITIAL_VIEW);
   const [liveView, setLiveView] = useState<PanZoomState>(INITIAL_VIEW);
   const [hoveredRect, setHoveredRect] = useState<ElementMapEntry["rect"] | null>(null);
-  const [paneFilter, setPaneFilter] = useState<PaneId | "all">("all");
-  const [authorFilter, setAuthorFilter] = useState<string>("all");
 
   const rootRef = useRef<HTMLDivElement>(null);
   const designHandle = useRef<ImagePaneHandle | null>(null);
@@ -174,21 +164,11 @@ export function ComparisonViewer({
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
   }
 
-  const authorOptions = useMemo(
-    () => Array.from(new Set(annotations.map((a) => a.authorEmail))),
-    [annotations]
-  );
-
   const visibleAnnotations = useMemo(
     () =>
-      annotations.filter(
-        (a) =>
-          // The pin you're on stays, so it doesn't vanish as you change its status.
-          (statusFilter === "all" || a.status === statusFilter || a.id === selectedAnnotationId) &&
-          (paneFilter === "all" || a.target === paneFilter) &&
-          (authorFilter === "all" || a.authorEmail === authorFilter)
-      ),
-    [annotations, statusFilter, selectedAnnotationId, paneFilter, authorFilter]
+      // The pin you're on stays, so it doesn't vanish as you change its status.
+      annotations.filter((a) => a.id === selectedAnnotationId || matchesPinFilters(a, filters)),
+    [annotations, filters, selectedAnnotationId]
   );
 
   function handlePaneClick(target: PaneId, point: { x: number; y: number }) {
@@ -290,84 +270,52 @@ export function ComparisonViewer({
   );
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs value={layout} onValueChange={(v) => setLayout(v as Layout)}>
-          <TabsList>
-            <TabsTrigger value="side-by-side">
-              <Columns2 className="h-4 w-4" />
-              Side by side
-            </TabsTrigger>
-            <TabsTrigger value="stacked">
-              <Rows2 className="h-4 w-4" />
-              Stacked
-            </TabsTrigger>
-            <TabsTrigger value="single">
-              <SquareStack className="h-4 w-4" />
-              Single
-            </TabsTrigger>
-            <TabsTrigger value="overlay">
-              <SquaresIntersect className="h-4 w-4" />
-              Overlay
-            </TabsTrigger>
-            <TabsTrigger value="swipe">
-              <MoveHorizontal className="h-4 w-4" />
-              Swipe
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Same gutter as the top bar, and the same height while it fits on one line. */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+        <LayoutTabs value={layout} onValueChange={setLayout} />
 
-        <div className="flex flex-wrap items-center gap-2">
-          {layout !== "overlay" && layout !== "swipe" ? (
-            <>
-              <Select value={paneFilter} onValueChange={(v) => setPaneFilter(v as PaneId | "all")}>
-                <SelectTrigger size="sm" className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All panes</SelectItem>
-                  <SelectItem value="design">{design.label}</SelectItem>
-                  <SelectItem value="live">{live.label}</SelectItem>
-                </SelectContent>
-              </Select>
-              {authorOptions.length > 1 ? (
-                <Select value={authorFilter} onValueChange={setAuthorFilter}>
-                  <SelectTrigger size="sm" className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All authors</SelectItem>
-                    {authorOptions.map((email) => (
-                      <SelectItem key={email} value={email}>
-                        {email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : null}
-
-              {layout === "single" ? (
-                <Tabs value={singlePane} onValueChange={(v) => setSinglePane(v as PaneId)}>
-                  <TabsList>
-                    <TabsTrigger value="design">{design.label}</TabsTrigger>
-                    <TabsTrigger value="live">{live.label}</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              ) : null}
-              <span className="w-14 text-center text-sm text-muted-foreground">{zoomPercent}%</span>
-              <Button
-                variant={syncLocked ? "secondary" : "outline"}
-                size="sm"
-                onClick={() => setSyncLocked((prev) => !prev)}
-                title="Toggle sync lock (S)"
-              >
-                {syncLocked ? <Link2 className="h-4 w-4" /> : <Link2Off className="h-4 w-4" />}
-                {syncLocked ? "Synced" : "Unsynced"}
-              </Button>
-            </>
-          ) : null}
-          {actions}
-        </div>
+        {layout !== "overlay" && layout !== "swipe" ? (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {layout === "single" ? (
+              <Tabs value={singlePane} onValueChange={(v) => setSinglePane(v as PaneId)}>
+                <TabsList>
+                  <TabsTrigger value="design">{design.label}</TabsTrigger>
+                  <TabsTrigger value="live">{live.label}</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            ) : null}
+            <span className="w-12 text-center text-sm text-muted-foreground" title="Zoom">
+              {zoomPercent}%
+            </span>
+            <SyncToggle synced={syncLocked} onSyncedChange={setSyncLocked} />
+          </div>
+        ) : null}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-8 w-8 text-muted-foreground", (layout === "overlay" || layout === "swipe") && "ml-auto")}
+              aria-label="How to use this view"
+            >
+              <CircleHelp className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" align="end" className="flex-col items-start gap-1">
+            {layout === "overlay" ? (
+              <p>Drag the design layer to nudge it.</p>
+            ) : layout === "swipe" ? (
+              <p>Drag the divider to compare.</p>
+            ) : (
+              <>
+                <p>Click either image to pin a comment.</p>
+                <p>Shortcuts: +/- zoom, 0 reset, F fit, S sync.</p>
+              </>
+            )}
+            <p>Scroll to zoom. Hold space or middle-drag to pan.</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {layout === "overlay" || layout === "swipe" ? (
@@ -377,7 +325,7 @@ export function ComparisonViewer({
           <div
             ref={rootRef}
             className={cn(
-              "relative h-[70vh] overflow-hidden rounded-lg border border-border",
+              "relative min-h-0 flex-1 overflow-hidden",
               layout === "side-by-side" && "flex flex-row",
               layout === "stacked" && "flex flex-col"
             )}
@@ -420,11 +368,6 @@ export function ComparisonViewer({
             )}
             {commentPanel}
           </div>
-
-          <p className="text-xs text-muted-foreground">
-            Click to pin · Scroll to zoom · Space/middle-drag to pan · Shortcuts: +/- zoom, 0 reset, F
-            fit, S toggle sync
-          </p>
         </>
       )}
     </div>

@@ -15,7 +15,13 @@ export function Breadcrumbs({ items }: { items: Crumb[] }) {
           {items.map((item, index) => {
             const isLast = index === items.length - 1;
             return (
-              <li key={index} className={cn("flex items-center gap-1.5", isLast ? "min-w-0" : "shrink-0")}>
+              // When space runs short the trail truncates before the current page
+              // does, and on small screens only the current page shows; the back
+              // arrow covers the rest.
+              <li
+                key={index}
+                className={cn("min-w-0 items-center gap-1.5", isLast ? "flex" : "hidden shrink-[4] md:flex")}
+              >
                 {item.href && !isLast ? (
                   <Link
                     href={item.href}

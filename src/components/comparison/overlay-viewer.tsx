@@ -154,8 +154,8 @@ export function OverlayViewer({
   );
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
         {mode === "overlay" ? (
           <>
             <div className="flex min-w-40 items-center gap-2">
@@ -203,7 +203,7 @@ export function OverlayViewer({
           <span className="w-10 text-xs text-muted-foreground">{Math.round(manualScale * 100)}%</span>
         </div>
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-2">
           <Button
             variant={activeTool === "measure" ? "secondary" : "outline"}
             size="sm"
@@ -225,7 +225,7 @@ export function OverlayViewer({
 
       <div
         ref={containerRef}
-        className="relative h-[70vh] touch-none overflow-hidden rounded-lg border border-border bg-muted"
+        className="relative min-h-0 flex-1 touch-none overflow-hidden bg-muted"
         style={{ isolation: "isolate" }}
       >
         <div
@@ -286,12 +286,6 @@ export function OverlayViewer({
         ) : null}
         {commentPanel}
       </div>
-
-      <p className="text-xs text-muted-foreground">
-        {mode === "overlay"
-          ? "Drag the design layer to nudge it. Scroll to zoom, space/middle-drag to pan."
-          : "Drag the divider to compare. Scroll to zoom, space/middle-drag to pan."}
-      </p>
     </div>
   );
 }

@@ -1,28 +1,35 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 import { createPortal } from "react-dom";
 
 // The top bar lives in the app layout, so a page can't pass it props. Instead
-// the bar renders a slot, and a page portals its own content (breadcrumbs) into it.
+// the bar renders slots, and a page portals its own content into them:
+// breadcrumbs at the start, and page actions at the end, before search.
+type SlotName = "start" | "end";
+
 const TopbarSlotContext = createContext<{
-  slot: HTMLElement | null;
-  setSlot: (slot: HTMLElement | null) => void;
+  slots: Partial<Record<SlotName, HTMLElement | null>>;
+  setSlot: (name: SlotName, slot: HTMLElement | null) => void;
 } | null>(null);
 
 export function TopbarSlotProvider({ children }: { children: React.ReactNode }) {
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
-  return <TopbarSlotContext.Provider value={{ slot, setSlot }}>{children}</TopbarSlotContext.Provider>;
+  const [slots, setSlots] = useState<Partial<Record<SlotName, HTMLElement | null>>>({});
+  const setSlot = useCallback((name: SlotName, slot: HTMLElement | null) => {
+    setSlots((prev) => (prev[name] === slot ? prev : { ...prev, [name]: slot }));
+  }, []);
+  return <TopbarSlotContext.Provider value={{ slots, setSlot }}>{children}</TopbarSlotContext.Provider>;
 }
 
 /** Where page content appears in the top bar. */
-export function TopbarSlot({ className }: { className?: string }) {
+export function TopbarSlot({ name, className }: { name: SlotName; className?: string }) {
   const setSlot = useContext(TopbarSlotContext)?.setSlot;
-  return <div ref={setSlot} className={className} />;
+  const ref = useCallback((el: HTMLElement | null) => setSlot?.(name, el), [setSlot, name]);
+  return <div ref={ref} className={className} />;
 }
 
 /** Renders its children in the top bar instead of in place. */
-export function TopbarPortal({ children }: { children: React.ReactNode }) {
-  const slot = useContext(TopbarSlotContext)?.slot;
-  return slot ? createPortal(children, slot) : null;
+export function TopbarPortal({ slot = "start", children }: { slot?: SlotName; children: React.ReactNode }) {
+  const target = useContext(TopbarSlotContext)?.slots[slot];
+  return target ? createPortal(children, target) : null;
 }

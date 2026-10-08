@@ -16,6 +16,7 @@ import { FORMER_MEMBER, guestAuthor } from "@/lib/authors";
 import { useComparisonRealtime } from "@/lib/realtime/use-comparison-realtime";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { TopbarPortal } from "@/components/app-shell/topbar-slot";
 import { AnnotationThread, CommentSidebar, ShowCommentsButton } from "@/components/comments/comment-sidebar";
 import type { TeamMemberOption } from "@/components/comments/comment-composer";
 import type { CommentData } from "@/components/comments/comment-item";
@@ -25,6 +26,7 @@ import {
 } from "@/components/comparison/comparison-viewer";
 import { LiveComparisonViewer } from "@/components/comparison/live-comparison-viewer";
 import type { LivePick } from "@/components/comparison/live-pane";
+import { matchesPinFilters, NO_PIN_FILTERS, type PinFilters } from "@/components/comparison/pin-filters";
 import type { AnnotationStatus } from "@/components/comparison/pin-marker";
 import { samePage, type Rect } from "@/lib/live/protocol";
 
@@ -88,14 +90,14 @@ export function ComparisonWorkspace({
   canModerate?: boolean;
   // Pin to open on load, e.g. when arriving from a search result.
   initialSelectedId?: string | null;
-  /** At the far right of the toolbar. */
+  /** Comparison-wide actions, shown at the right of the top bar. */
   actions: React.ReactNode;
 }) {
   const [annotations, setAnnotations] = useState<WorkspaceAnnotation[]>(initialAnnotations);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [viaProxy, setViaProxy] = useState(live.kind === "site" && live.viaProxy);
   const [commentsOpen, setCommentsOpen] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<AnnotationStatus | "all">("all");
+  const [filters, setFilters] = useState<PinFilters>(NO_PIN_FILTERS);
 
   // Remember whether the comment panel was hidden, so it stays out of the way
   // across comparisons. Read after mount to keep the server render stable.
@@ -414,9 +416,14 @@ export function ComparisonWorkspace({
     );
   }
 
+  const authorOptions = useMemo(
+    () => Array.from(new Set(annotations.map((a) => a.authorEmail))),
+    [annotations]
+  );
+
   const threads: AnnotationThread[] = annotations
     // The pin you're on stays, so it doesn't vanish as you change its status.
-    .filter((a) => statusFilter === "all" || a.status === statusFilter || a.id === selectedId)
+    .filter((a) => a.id === selectedId || matchesPinFilters(a, filters))
     // Newest first, so a pin you've just dropped is at the top of the panel.
     .sort((a, b) => b.number - a.number)
     .map((a) => ({
@@ -435,6 +442,8 @@ export function ComparisonWorkspace({
       comments: a.comments,
     }));
 
+  const otherViewers = presentUsers.filter((u) => u.userId !== currentUser.id);
+
   const commentPanel = commentsOpen ? (
     <CommentSidebar
       threads={threads}
@@ -448,36 +457,34 @@ export function ComparisonWorkspace({
       onUpdateComment={handleUpdateComment}
       onDeleteComment={handleDeleteComment}
       onClose={() => toggleComments(false)}
-      statusFilter={statusFilter}
-      onStatusFilterChange={setStatusFilter}
+      totalCount={annotations.length}
+      filters={filters}
+      onFiltersChange={setFilters}
+      authorOptions={authorOptions}
     />
   ) : (
     <ShowCommentsButton count={threads.length} onClick={() => toggleComments(true)} />
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {presentUsers.length > 1 ? (
-        <div className="flex items-center gap-1 self-end">
-          <span className="text-xs text-muted-foreground">Also viewing:</span>
-          <div className="flex -space-x-2">
-            {presentUsers
-              .filter((u) => u.userId !== currentUser.id)
-              .map((u) => (
-                <Tooltip key={u.userId}>
-                  <TooltipTrigger asChild>
-                    <Avatar className="h-6 w-6 border-2 border-background">
-                      <AvatarFallback className="text-[10px]">
-                        {u.email.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  </TooltipTrigger>
-                  <TooltipContent>{u.email}</TooltipContent>
-                </Tooltip>
-              ))}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <TopbarPortal slot="end">
+        {otherViewers.length > 0 ? (
+          <div className="flex -space-x-2" aria-label="Also viewing">
+            {otherViewers.map((u) => (
+              <Tooltip key={u.userId}>
+                <TooltipTrigger asChild>
+                  <Avatar className="h-7 w-7 border-2 border-background">
+                    <AvatarFallback className="text-[10px]">{u.email.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{u.email} is viewing</TooltipContent>
+              </Tooltip>
+            ))}
           </div>
-        </div>
-      ) : null}
+        ) : null}
+        {actions}
+      </TopbarPortal>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {live.kind === "capture" ? (
@@ -491,8 +498,7 @@ export function ComparisonWorkspace({
             onDragAnnotation={canModerate ? handleDrag : undefined}
             elementMap={live.elementMap}
             commentPanel={commentPanel}
-            statusFilter={statusFilter}
-            actions={actions}
+            filters={filters}
           />
         ) : (
           <LiveComparisonViewer
@@ -513,8 +519,7 @@ export function ComparisonWorkspace({
             onDragAnnotation={canModerate ? handleDrag : undefined}
             onViaProxyChange={canModerate ? handleViaProxyChange : undefined}
             commentPanel={commentPanel}
-            statusFilter={statusFilter}
-            actions={actions}
+            filters={filters}
           />
         )}
       </div>

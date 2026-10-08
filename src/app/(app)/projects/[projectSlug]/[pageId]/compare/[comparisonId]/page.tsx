@@ -227,8 +227,9 @@ export default async function ComparisonDetailPage({
       };
 
   return (
-    // A live comparison fills the window below the top bar (h-14) and the page padding (p-6).
-    <div className={capture ? "flex flex-col gap-4" : "flex h-[calc(100dvh-6.5rem)] min-h-[40rem] flex-col gap-4"}>
+    // Fills the window below the top bar (h-14), edge to edge: the page's p-6 is
+    // cancelled so the toolbar can share the top bar's gutter.
+    <div className="-m-6 flex h-[calc(100dvh-3.5rem)] min-h-[40rem] flex-col">
       <Breadcrumbs
         items={[
           { label: row.project.name, href: `/projects/${projectSlug}` },
