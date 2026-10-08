@@ -95,7 +95,7 @@ export default async function DashboardPage() {
               needsAttention.map((item) => (
                 <Link
                   key={item.annotationId}
-                  href={`/projects/${item.projectSlug}/${item.pageId}/compare/${item.comparisonId}`}
+                  href={`/projects/${item.projectSlug}/${item.pageId}/compare/${item.comparisonId}?pin=${item.annotationId}`}
                   className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                 >
                   <span className="truncate">
@@ -131,7 +131,11 @@ export default async function DashboardPage() {
               activity.map((item) => (
                 <Link
                   key={`${item.type}-${item.id}`}
-                  href={`/projects/${item.projectSlug}/${item.pageId}/compare/${item.type === "comparison" ? item.id : item.comparisonId}`}
+                  href={
+                    item.type === "comparison"
+                      ? `/projects/${item.projectSlug}/${item.pageId}/compare/${item.id}`
+                      : `/projects/${item.projectSlug}/${item.pageId}/compare/${item.comparisonId}?pin=${item.type === "comment" ? item.annotationId : item.id}`
+                  }
                   className="flex items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                 >
                   {item.type === "comment" ? (

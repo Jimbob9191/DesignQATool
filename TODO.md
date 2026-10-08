@@ -49,20 +49,6 @@ Nothing open.
 
 ---
 
-### [ ] 15. Deep-link to the pin from notifications and the dashboard
-**P2 · S · Touches:** `src/lib/notifications/notify.ts`, `src/app/(app)/dashboard/page.tsx`
-
-**Problem:** The compare page already opens a specific pin from `?pin=<annotationId>`, but notification emails (`notify.ts:98`) and the dashboard's "Needs attention" and "Activity" links (`dashboard/page.tsx:98`, `:134`) don't use it. Users land on the comparison and have to hunt for the thread. Also:
-- the pin's author isn't notified of replies unless they've commented on it themselves;
-- notification failures are swallowed without any logging (`notify.ts:127`);
-- preferences are fetched once per recipient (N queries).
-
-**Do:** append `?pin=` to all three link types (for activity items, only those tied to a pin). Add the annotation's `created_by` to the reply recipients. `console.error` inside the catch. Fetch preferences for all recipients in one `inArray` query.
-
-**Done when:** clicking any of those links opens the comparison with the right thread selected.
-
----
-
 ### [ ] 18. Wrap multi-step writes in transactions
 **P2 · S–M · Touches:** `src/lib/actions/{teams,invitations,comparisons,annotations}.ts`
 
