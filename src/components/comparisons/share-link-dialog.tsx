@@ -14,7 +14,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,11 +21,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export type ShareLinkData = { id: string; url: string; allowAnonymousComments: boolean; expiresAt: string | null };
 
 export function ShareLinkDialog({
-  trigger,
+  open,
+  onOpenChange,
   comparisonId,
   existingLinks,
 }: {
-  trigger: React.ReactNode;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   comparisonId: string;
   existingLinks: ShareLinkData[];
 }) {
@@ -70,8 +71,7 @@ export function ShareLinkDialog({
   }
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Share this comparison</DialogTitle>
