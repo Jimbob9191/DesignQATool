@@ -128,7 +128,7 @@ export async function getNeedsAttention(teamId: string, limit = 10): Promise<Nee
 }
 
 export type ActivityItem =
-  | { type: "comment"; id: string; body: string; authorEmail: string; createdAt: Date; comparisonId: string; pageId: string; projectSlug: string; pageName: string }
+  | { type: "comment"; id: string; body: string; authorEmail: string; createdAt: Date; annotationId: string; comparisonId: string; pageId: string; projectSlug: string; pageName: string }
   | { type: "annotation"; id: string; authorEmail: string; createdAt: Date; comparisonId: string; pageId: string; projectSlug: string; pageName: string }
   | { type: "comparison"; id: string; name: string; authorEmail: string; createdAt: Date; pageId: string; projectSlug: string; pageName: string };
 
@@ -143,6 +143,7 @@ export async function getActivityFeed(teamId: string, limit = 15): Promise<Activ
         authorEmail: commentAuthor.email,
         guestName: comments.guestName,
         createdAt: comments.createdAt,
+        annotationId: comments.annotationId,
         comparisonId: annotations.comparisonId,
         pageId: pages.id,
         projectSlug: projects.slug,
