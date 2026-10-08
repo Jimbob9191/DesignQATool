@@ -12,7 +12,9 @@ import {
   submittedEmail,
 } from "../src/lib/auth/form-state.ts";
 import { isTeamScopedPath, switchTeamHref } from "../src/lib/auth/team-switch.ts";
+import { listTeamNames, planAccountDeletion } from "../src/lib/auth/account-deletion.ts";
 import {
+  changePasswordSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   signInSchema,
@@ -144,6 +146,89 @@ test("resetPasswordSchema rejects mismatched passwords on the confirm field", ()
   });
   assert.equal(result.success, false);
   assert.equal(fieldErrorsFrom(result.error).confirmPassword, "Passwords do not match");
+});
+
+test("changePasswordSchema accepts a current password plus a valid matching pair", () => {
+  const result = changePasswordSchema.safeParse({
+    currentPassword: "old",
+    password: "correct-horse",
+    confirmPassword: "correct-horse",
+  });
+  assert.equal(result.success, true);
+});
+
+test("changePasswordSchema requires the current password", () => {
+  const result = changePasswordSchema.safeParse({
+    currentPassword: "",
+    password: "correct-horse",
+    confirmPassword: "correct-horse",
+  });
+  assert.equal(result.success, false);
+  assert.equal(fieldErrorsFrom(result.error).currentPassword, "Enter your current password");
+});
+
+test("changePasswordSchema applies the reset form's rules to the new password", () => {
+  const short = "a".repeat(PASSWORD_MIN_LENGTH - 1);
+  const tooShort = changePasswordSchema.safeParse({
+    currentPassword: "old-password",
+    password: short,
+    confirmPassword: short,
+  });
+  assert.match(fieldErrorsFrom(tooShort.error).password, /at least 8 characters/);
+
+  const mismatched = changePasswordSchema.safeParse({
+    currentPassword: "old-password",
+    password: "correct-horse",
+    confirmPassword: "correct-horsf",
+  });
+  assert.equal(fieldErrorsFrom(mismatched.error).confirmPassword, "Passwords do not match");
+});
+
+test("changePasswordSchema rejects reusing the current password", () => {
+  const result = changePasswordSchema.safeParse({
+    currentPassword: "correct-horse",
+    password: "correct-horse",
+    confirmPassword: "correct-horse",
+  });
+  assert.equal(result.success, false);
+  assert.match(fieldErrorsFrom(result.error).password, /different from your current one/);
+});
+
+const membership = (overrides) => ({
+  teamId: "t",
+  teamName: "Team",
+  role: "owner",
+  memberCount: 1,
+  ownerCount: 1,
+  ...overrides,
+});
+
+test("planAccountDeletion deletes teams where the user is the only member", () => {
+  const plan = planAccountDeletion([
+    membership({ teamId: "solo" }),
+    membership({ teamId: "shared", role: "member", memberCount: 3 }),
+  ]);
+  assert.deepEqual(plan, { ok: true, soleMemberTeamIds: ["solo"] });
+});
+
+test("planAccountDeletion refuses while the user is the sole owner of a shared team", () => {
+  const plan = planAccountDeletion([
+    membership({ teamId: "solo" }),
+    membership({ teamId: "a", teamName: "Acme", memberCount: 2 }),
+    membership({ teamId: "b", teamName: "Beta", memberCount: 4 }),
+  ]);
+  assert.deepEqual(plan, { ok: false, blockingTeamNames: ["Acme", "Beta"] });
+});
+
+test("planAccountDeletion lets a co-owner of a shared team leave it behind", () => {
+  const plan = planAccountDeletion([membership({ memberCount: 3, ownerCount: 2 })]);
+  assert.deepEqual(plan, { ok: true, soleMemberTeamIds: [] });
+});
+
+test("listTeamNames reads as a sentence", () => {
+  assert.equal(listTeamNames(["A"]), '"A"');
+  assert.equal(listTeamNames(["A", "B"]), '"A" and "B"');
+  assert.equal(listTeamNames(["A", "B", "C"]), '"A", "B" and "C"');
 });
 
 test("fieldErrorsFrom keeps only the first message per field", () => {

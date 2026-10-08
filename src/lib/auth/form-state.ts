@@ -6,7 +6,7 @@
 import type { AuthError, EmailOtpType } from "@supabase/supabase-js";
 import type { ZodError } from "zod";
 
-export type AuthField = "email" | "password" | "confirmPassword";
+export type AuthField = "email" | "currentPassword" | "password" | "confirmPassword";
 
 export type AuthFormState = {
   /**
@@ -28,6 +28,8 @@ export type AuthFormState = {
 };
 
 export const initialAuthState: AuthFormState = { status: "idle" };
+
+export const TOO_MANY_ATTEMPTS = "Too many attempts. Wait a few minutes and try again.";
 
 /** First error message per field, in Zod's issue order. */
 export function fieldErrorsFrom(error: ZodError): Partial<Record<AuthField, string>> {

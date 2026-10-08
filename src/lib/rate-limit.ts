@@ -51,6 +51,22 @@ export async function consumeRateLimits(
 }
 
 /**
+ * Counts one password check against the caller's IP and the account. Shared
+ * by sign-in and change-password, which both reveal whether a password is
+ * right, so neither can be used to get past the other's limit. Supabase's own
+ * per-IP limit doesn't help here: every check reaches it from this server, so
+ * all users share one bucket. Throttle per client IP (password spraying) and
+ * per account (guessing one person's password).
+ */
+export async function consumePasswordAttempt(email: string): Promise<boolean> {
+  const ip = await clientIp();
+  return consumeRateLimits([
+    [`signin:ip:${ip}`, 30, 10 * 60],
+    [`signin:email:${email.toLowerCase()}`, 10, 10 * 60],
+  ]);
+}
+
+/**
  * The caller's IP. On Vercel both headers are set by the edge network itself
  * (any client-sent values are overwritten), so they can't be spoofed there.
  */
