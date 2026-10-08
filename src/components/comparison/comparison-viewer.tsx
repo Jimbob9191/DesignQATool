@@ -43,13 +43,14 @@ type Layout = "side-by-side" | "stacked" | "single" | "overlay" | "swipe";
 type PaneId = "design" | "live";
 
 const INITIAL_VIEW: PanZoomState = { scale: 1, tx: 0, ty: 0 };
-const STATUS_OPTIONS: AnnotationStatus[] = ["open", "resolved", "wont_fix", "needs_review"];
 
 export function ComparisonViewer({
   design,
   live,
   annotations = [],
   selectedAnnotationId = null,
+  statusFilter = "all",
+  actions,
   onSelectAnnotation,
   onCreateAnnotation,
   onDragAnnotation,
@@ -60,6 +61,10 @@ export function ComparisonViewer({
   live: ComparisonImage;
   annotations?: AnnotationData[];
   selectedAnnotationId?: string | null;
+  /** Set from the comment panel. */
+  statusFilter?: AnnotationStatus | "all";
+  /** At the far right of the toolbar. */
+  actions?: React.ReactNode;
   onSelectAnnotation?: (id: string) => void;
   onCreateAnnotation?: (
     target: PaneId,
@@ -79,7 +84,6 @@ export function ComparisonViewer({
   const [designView, setDesignView] = useState<PanZoomState>(INITIAL_VIEW);
   const [liveView, setLiveView] = useState<PanZoomState>(INITIAL_VIEW);
   const [hoveredRect, setHoveredRect] = useState<ElementMapEntry["rect"] | null>(null);
-  const [statusFilter, setStatusFilter] = useState<AnnotationStatus | "all">("all");
   const [paneFilter, setPaneFilter] = useState<PaneId | "all">("all");
   const [authorFilter, setAuthorFilter] = useState<string>("all");
 
@@ -179,11 +183,12 @@ export function ComparisonViewer({
     () =>
       annotations.filter(
         (a) =>
-          (statusFilter === "all" || a.status === statusFilter) &&
+          // The pin you're on stays, so it doesn't vanish as you change its status.
+          (statusFilter === "all" || a.status === statusFilter || a.id === selectedAnnotationId) &&
           (paneFilter === "all" || a.target === paneFilter) &&
           (authorFilter === "all" || a.authorEmail === authorFilter)
       ),
-    [annotations, statusFilter, paneFilter, authorFilter]
+    [annotations, statusFilter, selectedAnnotationId, paneFilter, authorFilter]
   );
 
   function handlePaneClick(target: PaneId, point: { x: number; y: number }) {
@@ -312,70 +317,57 @@ export function ComparisonViewer({
           </TabsList>
         </Tabs>
 
-        {layout !== "overlay" && layout !== "swipe" ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={paneFilter} onValueChange={(v) => setPaneFilter(v as PaneId | "all")}>
-              <SelectTrigger size="sm" className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All panes</SelectItem>
-                <SelectItem value="design">{design.label}</SelectItem>
-                <SelectItem value="live">{live.label}</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v as AnnotationStatus | "all")}
-            >
-              <SelectTrigger size="sm" className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                {STATUS_OPTIONS.map((s) => (
-                  <SelectItem key={s} value={s} className="capitalize">
-                    {s.replace("_", " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {authorOptions.length > 1 ? (
-              <Select value={authorFilter} onValueChange={setAuthorFilter}>
-                <SelectTrigger size="sm" className="w-40">
+        <div className="flex flex-wrap items-center gap-2">
+          {layout !== "overlay" && layout !== "swipe" ? (
+            <>
+              <Select value={paneFilter} onValueChange={(v) => setPaneFilter(v as PaneId | "all")}>
+                <SelectTrigger size="sm" className="w-32">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All authors</SelectItem>
-                  {authorOptions.map((email) => (
-                    <SelectItem key={email} value={email}>
-                      {email}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">All panes</SelectItem>
+                  <SelectItem value="design">{design.label}</SelectItem>
+                  <SelectItem value="live">{live.label}</SelectItem>
                 </SelectContent>
               </Select>
-            ) : null}
+              {authorOptions.length > 1 ? (
+                <Select value={authorFilter} onValueChange={setAuthorFilter}>
+                  <SelectTrigger size="sm" className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All authors</SelectItem>
+                    {authorOptions.map((email) => (
+                      <SelectItem key={email} value={email}>
+                        {email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
 
-            {layout === "single" ? (
-              <Tabs value={singlePane} onValueChange={(v) => setSinglePane(v as PaneId)}>
-                <TabsList>
-                  <TabsTrigger value="design">{design.label}</TabsTrigger>
-                  <TabsTrigger value="live">{live.label}</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            ) : null}
-            <span className="w-14 text-center text-sm text-muted-foreground">{zoomPercent}%</span>
-            <Button
-              variant={syncLocked ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => setSyncLocked((prev) => !prev)}
-              title="Toggle sync lock (S)"
-            >
-              {syncLocked ? <Link2 className="h-4 w-4" /> : <Link2Off className="h-4 w-4" />}
-              {syncLocked ? "Synced" : "Unsynced"}
-            </Button>
-          </div>
-        ) : null}
+              {layout === "single" ? (
+                <Tabs value={singlePane} onValueChange={(v) => setSinglePane(v as PaneId)}>
+                  <TabsList>
+                    <TabsTrigger value="design">{design.label}</TabsTrigger>
+                    <TabsTrigger value="live">{live.label}</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              ) : null}
+              <span className="w-14 text-center text-sm text-muted-foreground">{zoomPercent}%</span>
+              <Button
+                variant={syncLocked ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setSyncLocked((prev) => !prev)}
+                title="Toggle sync lock (S)"
+              >
+                {syncLocked ? <Link2 className="h-4 w-4" /> : <Link2Off className="h-4 w-4" />}
+                {syncLocked ? "Synced" : "Unsynced"}
+              </Button>
+            </>
+          ) : null}
+          {actions}
+        </div>
       </div>
 
       {layout === "overlay" || layout === "swipe" ? (

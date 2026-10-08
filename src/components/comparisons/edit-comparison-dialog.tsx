@@ -13,7 +13,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,16 +31,17 @@ export function EditComparisonDialog({
   designOptions,
   designPinCount,
   sitePinCount,
-  trigger,
+  open,
+  onOpenChange,
 }: {
   comparisonId: string;
   current: ComparisonValues;
   designOptions: DesignOption[];
   designPinCount: number;
   sitePinCount: number;
-  trigger: React.ReactNode;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState(current.name);
   const [designAssetId, setDesignAssetId] = useState(current.designAssetId);
   const [liveUrl, setLiveUrl] = useState(current.live?.url ?? "");
@@ -54,14 +54,15 @@ export function EditComparisonDialog({
   const canSubmit = name.trim() && designAssetId && (current.live === null || liveUrl.trim());
 
   // Opening always starts from what's saved, not from an abandoned edit.
-  function handleOpenChange(next: boolean) {
-    if (next) {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
       setName(current.name);
       setDesignAssetId(current.designAssetId);
       setLiveUrl(current.live?.url ?? "");
       setViewportWidth(current.live?.viewportWidth ?? 0);
     }
-    setOpen(next);
   }
 
   async function handleSubmit() {
@@ -79,13 +80,12 @@ export function EditComparisonDialog({
     }
 
     toast.success("Comparison updated");
-    setOpen(false);
+    onOpenChange(false);
     router.refresh();
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit comparison</DialogTitle>

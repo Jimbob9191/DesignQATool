@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, ScanEye } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { ArrowLeft, Menu, ScanEye } from "lucide-react";
 
 import { NavLinks } from "@/components/app-shell/nav-links";
+import { TopbarSlot } from "@/components/app-shell/topbar-slot";
 import { GlobalSearch } from "@/components/search/global-search";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -23,6 +25,7 @@ import { signOut } from "@/lib/actions/auth";
 export function Topbar({ userEmail }: { userEmail: string }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const initials = userEmail.slice(0, 2).toUpperCase();
+  const backHref = backHrefFor(usePathname());
 
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -46,6 +49,19 @@ export function Topbar({ userEmail }: { userEmail: string }) {
           </div>
         </SheetContent>
       </Sheet>
+
+      {backHref ? (
+        <Button variant="ghost" size="icon" asChild>
+          <Link href={backHref} aria-label="Back" title="Back">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+      ) : null}
+
+      <TopbarSlot className="flex min-w-0 items-center" />
+
+      {/* Everything after this sits on the right. */}
+      <div className="flex-1" />
 
       <GlobalSearch />
 
@@ -80,4 +96,11 @@ export function Topbar({ userEmail }: { userEmail: string }) {
       </DropdownMenu>
     </header>
   );
+}
+
+/** Pages that get a back button in the top bar, and where it goes. */
+function backHrefFor(pathname: string): string | null {
+  // A comparison goes back to its page.
+  const comparison = pathname.match(/^(\/projects\/[^/]+\/[^/]+)\/compare\/[^/]+\/?$/);
+  return comparison ? comparison[1] : null;
 }

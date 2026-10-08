@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, MessageSquare, MoreHorizontal, PanelRightClose, RotateCcw, Trash2 } from "lucide-react";
+import { MessageSquare, MoreHorizontal, PanelRightClose, Trash2 } from "lucide-react";
 
 import type { AnnotationStatus } from "@/components/comparison/pin-marker";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { CommentComposer, type TeamMemberOption } from "@/components/comments/comment-composer";
 import { CommentItem, type CommentData } from "@/components/comments/comment-item";
@@ -63,6 +64,8 @@ export function CommentSidebar({
   onUpdateComment,
   onDeleteComment,
   onClose,
+  statusFilter,
+  onStatusFilterChange,
 }: {
   threads: AnnotationThread[];
   selectedId: string | null;
@@ -75,6 +78,8 @@ export function CommentSidebar({
   onUpdateComment: (annotationId: string, commentId: string, body: string) => void;
   onDeleteComment: (annotationId: string, commentId: string) => void;
   onClose?: () => void;
+  statusFilter: AnnotationStatus | "all";
+  onStatusFilterChange: (status: AnnotationStatus | "all") => void;
 }) {
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   // One editor open at a time: the selected pin's composer, or this comment's
@@ -104,10 +109,23 @@ export function CommentSidebar({
       data-comment-panel="open"
       className="absolute inset-y-2 right-2 z-20 flex w-80 max-w-[calc(100%-1rem)] flex-col rounded-lg border border-border bg-background/85 shadow-lg backdrop-blur-sm"
     >
-      <div className="flex items-center justify-between border-b border-border py-1 pr-1 pl-3">
+      <div className="flex items-center gap-2 border-b border-border py-1 pr-1 pl-3">
         <p className="text-sm font-medium">
           {threads.length} pin{threads.length === 1 ? "" : "s"}
         </p>
+        <Select value={statusFilter} onValueChange={(v) => onStatusFilterChange(v as AnnotationStatus | "all")}>
+          <SelectTrigger size="sm" className="ml-auto h-7 w-auto gap-1 px-2 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {STATUSES.map((status) => (
+              <SelectItem key={status} value={status}>
+                {STATUS_LABEL[status]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {onClose ? (
           <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onClose} title="Hide comments">
             <PanelRightClose className="h-4 w-4" />
@@ -117,7 +135,9 @@ export function CommentSidebar({
       <ScrollArea className="min-h-0 flex-1">
         {threads.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">
-            Click either image to drop a pin and start a thread.
+            {statusFilter === "all"
+              ? "Click either image to drop a pin and start a thread."
+              : `No pins are ${STATUS_LABEL[statusFilter].toLowerCase()}.`}
           </p>
         ) : (
           threads.map((thread) => {
@@ -159,20 +179,6 @@ export function CommentSidebar({
                   </div>
                   {/* Menu clicks bubble through the portal to the thread, so stop them here. */}
                   <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
-                    {onStatusChange ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onStatusChange(thread.id, thread.status === "resolved" ? "open" : "resolved")}
-                        title={thread.status === "resolved" ? "Reopen" : "Resolve"}
-                      >
-                        {thread.status === "resolved" ? (
-                          <RotateCcw className="h-3.5 w-3.5" />
-                        ) : (
-                          <Check className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    ) : null}
                     {onStatusChange || (onDelete && thread.canDelete) ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

@@ -1,9 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { authUsers } from "drizzle-orm/supabase";
-import { ArrowLeft } from "lucide-react";
 
 import { getAppOrigin } from "@/lib/app-origin";
 import { assetDisplayName } from "@/lib/assets/name";
@@ -26,14 +24,10 @@ import {
 import type { Rect } from "@/lib/live/protocol";
 import { bridgeSnippet } from "@/lib/live/protocol";
 import { proxyOriginFor } from "@/lib/live/proxy";
-import { Button } from "@/components/ui/button";
 import { ComparisonWorkspace, type WorkspaceLiveSide } from "@/components/comparison/comparison-workspace";
-import { DeleteComparisonButton } from "@/components/comparisons/delete-comparison-button";
-import { EditComparisonDialog } from "@/components/comparisons/edit-comparison-dialog";
-import { ExportPdfButton } from "@/components/comparisons/export-pdf-button";
+import { Breadcrumbs } from "@/components/app-shell/breadcrumbs";
+import { ComparisonActionsMenu } from "@/components/comparisons/comparison-actions-menu";
 import { RefreshCaptureButton } from "@/components/comparisons/refresh-capture-button";
-import { ShareLinkDialog } from "@/components/comparisons/share-link-dialog";
-import { Share2 } from "lucide-react";
 
 export default async function ComparisonDetailPage({
   params,
@@ -55,6 +49,7 @@ export default async function ComparisonDetailPage({
     .select({
       comparison: comparisons,
       page: pages,
+      project: projects,
       design: designAssets,
       capture: captureAssets,
     })
@@ -232,64 +227,15 @@ export default async function ComparisonDetailPage({
       };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href={`/projects/${projectSlug}/${pageId}`}>
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">{row.comparison.name}</h1>
-            <p className="text-sm text-muted-foreground">{row.page.name}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {canEdit && hasNewerCapture && latestCapture ? (
-            <RefreshCaptureButton comparisonId={comparisonId} newCaptureAssetId={latestCapture.assetId} />
-          ) : null}
-          {canEdit ? (
-            <ShareLinkDialog
-              comparisonId={comparisonId}
-              existingLinks={shareLinkOptions}
-              trigger={
-                <Button variant="outline">
-                  <Share2 className="h-4 w-4" />
-                  Share
-                </Button>
-              }
-            />
-          ) : null}
-          <ExportPdfButton comparisonId={comparisonId} comparisonName={row.comparison.name} />
-          {canEdit ? (
-            <EditComparisonDialog
-              comparisonId={comparisonId}
-              current={{
-                name: row.comparison.name,
-                designAssetId: row.design.id,
-                live: capture
-                  ? null
-                  : { url: row.comparison.liveUrl!, viewportWidth: row.comparison.viewportWidth! },
-              }}
-              designOptions={designOptions}
-              designPinCount={initialAnnotations.filter((a) => a.target === "design").length}
-              sitePinCount={initialAnnotations.filter((a) => a.target === "live").length}
-              trigger={<Button variant="outline">Edit</Button>}
-            />
-          ) : null}
-          {canEdit ? (
-            <DeleteComparisonButton
-              projectSlug={projectSlug}
-              pageId={pageId}
-              comparisonId={comparisonId}
-              comparisonName={row.comparison.name}
-              trigger={<Button variant="outline">Delete comparison</Button>}
-            />
-          ) : null}
-        </div>
-      </div>
-
+    // A live comparison fills the window below the top bar (h-14) and the page padding (p-6).
+    <div className={capture ? "flex flex-col gap-4" : "flex h-[calc(100dvh-6.5rem)] min-h-[40rem] flex-col gap-4"}>
+      <Breadcrumbs
+        items={[
+          { label: row.project.name, href: `/projects/${projectSlug}` },
+          { label: row.page.name, href: `/projects/${projectSlug}/${pageId}` },
+          { label: row.comparison.name },
+        ]}
+      />
       <ComparisonWorkspace
         comparisonId={comparisonId}
         design={{
@@ -305,6 +251,33 @@ export default async function ComparisonDetailPage({
         currentUser={{ id: user.id, email: user.email ?? "unknown" }}
         teamMembers={teamMemberOptions}
         canModerate={canEdit}
+        actions={
+          <>
+            {canEdit && hasNewerCapture && latestCapture ? (
+              <RefreshCaptureButton comparisonId={comparisonId} newCaptureAssetId={latestCapture.assetId} />
+            ) : null}
+            <ComparisonActionsMenu
+              comparisonId={comparisonId}
+              comparisonName={row.comparison.name}
+              projectSlug={projectSlug}
+              pageId={pageId}
+              canEdit={canEdit}
+              shareLinks={shareLinkOptions}
+              edit={{
+                current: {
+                  name: row.comparison.name,
+                  designAssetId: row.design.id,
+                  live: capture
+                    ? null
+                    : { url: row.comparison.liveUrl!, viewportWidth: row.comparison.viewportWidth! },
+                },
+                designOptions,
+                designPinCount: initialAnnotations.filter((a) => a.target === "design").length,
+                sitePinCount: initialAnnotations.filter((a) => a.target === "live").length,
+              }}
+            />
+          </>
+        }
       />
     </div>
   );

@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AnnotationData, ComparisonImage } from "@/components/comparison/comparison-viewer";
 import { ImagePane, type ImagePaneHandle, type PaneTransform } from "@/components/comparison/image-pane";
 import { LivePane, type LivePaneHandle, type LivePick, type LiveTransform } from "@/components/comparison/live-pane";
@@ -57,7 +58,6 @@ type Layout = "side-by-side" | "stacked" | "single" | "overlay" | "swipe";
 type PaneId = "design" | "live";
 
 const INITIAL_VIEW: PanZoomState = { scale: 1, tx: 0, ty: 0 };
-const STATUS_OPTIONS: AnnotationStatus[] = ["open", "resolved", "wont_fix", "needs_review"];
 // After the design pane drives the site's scroll, ignore the site's scroll
 // reports for a moment so they don't fight the drag/wheel still under way.
 const DESIGN_DRIVE_HOLD_MS = 250;
@@ -68,18 +68,22 @@ export function LiveComparisonViewer({
   snippet,
   annotations,
   selectedAnnotationId,
+  statusFilter,
   onSelectAnnotation,
   onCreateDesignAnnotation,
   onCreateLiveAnnotation,
   onDragAnnotation,
   onViaProxyChange,
   commentPanel,
+  actions,
 }: {
   design: ComparisonImage;
   site: LiveSite;
   snippet: string;
   annotations: LiveAnnotationData[];
   selectedAnnotationId: string | null;
+  /** Set from the comment panel. */
+  statusFilter: AnnotationStatus | "all";
   onSelectAnnotation: (id: string) => void;
   onCreateDesignAnnotation?: (point: { x: number; y: number }) => void;
   onCreateLiveAnnotation?: (pick: LivePick) => void;
@@ -87,6 +91,8 @@ export function LiveComparisonViewer({
   onViaProxyChange?: (viaProxy: boolean) => void;
   /** Floated over the right edge of the canvas. */
   commentPanel?: React.ReactNode;
+  /** At the far right of the toolbar. */
+  actions?: React.ReactNode;
 }) {
   const [layout, setLayout] = useState<Layout>("side-by-side");
   const [singlePane, setSinglePane] = useState<PaneId>("live");
@@ -101,7 +107,6 @@ export function LiveComparisonViewer({
   const [opacity, setOpacity] = useState(50);
   const [blendDifference, setBlendDifference] = useState(false);
   const [dividerPercent, setDividerPercent] = useState(50);
-  const [statusFilter, setStatusFilter] = useState<AnnotationStatus | "all">("all");
   const [paneFilter, setPaneFilter] = useState<PaneId | "all">("all");
   const [authorFilter, setAuthorFilter] = useState<string>("all");
 
@@ -255,11 +260,12 @@ export function LiveComparisonViewer({
     () =>
       annotations.filter(
         (a) =>
-          (statusFilter === "all" || a.status === statusFilter) &&
+          // The pin you're on stays, so it doesn't vanish as you change its status.
+          (statusFilter === "all" || a.status === statusFilter || a.id === selectedAnnotationId) &&
           (paneFilter === "all" || a.target === paneFilter) &&
           (authorFilter === "all" || a.authorEmail === authorFilter)
       ),
-    [annotations, statusFilter, paneFilter, authorFilter]
+    [annotations, statusFilter, selectedAnnotationId, paneFilter, authorFilter]
   );
 
   const trackedPins = useMemo(
@@ -408,7 +414,7 @@ export function LiveComparisonViewer({
   ).length;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Tabs value={layout} onValueChange={(v) => setLayout(v as Layout)}>
@@ -437,18 +443,82 @@ export function LiveComparisonViewer({
           </Tabs>
 
           {onCreateLiveAnnotation ? (
-            <Tabs value={mode} onValueChange={(v) => setMode(v as LiveMode)}>
-              <TabsList>
-                <TabsTrigger value="comment" title="Click elements to pin them (C)">
-                  <MessageSquarePlus className="h-4 w-4" />
-                  Comment
-                </TabsTrigger>
-                <TabsTrigger value="browse" title="Use the site normally (C)">
-                  <MousePointer2 className="h-4 w-4" />
-                  Browse
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <Tooltip delayDuration={500}>
+              <TooltipTrigger asChild>
+                <Tabs value={mode} onValueChange={(v) => setMode(v as LiveMode)}>
+                  <TabsList>
+                    <TabsTrigger value="comment">
+                      <MessageSquarePlus className="h-4 w-4" />
+                      Comment
+                    </TabsTrigger>
+                    <TabsTrigger value="browse">
+                      <MousePointer2 className="h-4 w-4" />
+                      Browse
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="flex-col items-start gap-1">
+                <p>Comment: click any element on the site, or a spot on the design, to pin it.</p>
+                <p>Browse: use the site normally.</p>
+                <p>Scroll either side to move both. Pinch or ⌘-scroll to zoom the design.</p>
+                <p>Shortcuts: C comment/browse, S sync, F fit design.</p>
+                {useProxy ? <p>Page look wrong? Switch to Direct and add the snippet to the site.</p> : null}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
+        </div>
+
+        {/* Takes the room between the two groups; wraps to its own line below 12rem. */}
+        <div className="flex min-w-48 flex-1 basis-0 items-center gap-2 text-xs text-muted-foreground">
+          {site.proxyOrigin ? (
+            onViaProxyChange ? (
+              <Select
+                value={useProxy ? "proxy" : "direct"}
+                onValueChange={(v) => handleViaProxyChange(v === "proxy")}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="h-6 w-auto shrink-0 gap-1 px-2 text-xs"
+                  title="How the site is loaded"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="proxy">Preview proxy — no setup</SelectItem>
+                  <SelectItem value="direct">Direct — needs the snippet</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <span className="shrink-0 rounded border border-border px-1.5 py-0.5">
+                {useProxy ? "Preview proxy" : "Direct"}
+              </span>
+            )
+          ) : null}
+          <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono">
+            {site.viewportWidth}px
+          </span>
+          <span className="min-w-0 truncate font-mono" title={currentUrl}>
+            {currentUrl}
+          </span>
+          <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+            <a href={currentUrl} target="_blank" rel="noopener noreferrer" title="Open in a new tab">
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => liveHandle.current?.reload()}
+            title="Reload the site"
+          >
+            <RotateCw className="h-3.5 w-3.5" />
+          </Button>
+          {otherPagePins > 0 ? (
+            <span className="shrink-0">
+              · {otherPagePins} pin{otherPagePins === 1 ? "" : "s"} on other pages
+            </span>
           ) : null}
         </div>
 
@@ -489,22 +559,6 @@ export function LiveComparisonViewer({
                   <SelectItem value="live">{site.label}</SelectItem>
                 </SelectContent>
               </Select>
-              <Select
-                value={statusFilter}
-                onValueChange={(v) => setStatusFilter(v as AnnotationStatus | "all")}
-              >
-                <SelectTrigger size="sm" className="w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  {STATUS_OPTIONS.map((s) => (
-                    <SelectItem key={s} value={s} className="capitalize">
-                      {s.replace("_", " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               {authorOptions.length > 1 ? (
                 <Select value={authorFilter} onValueChange={setAuthorFilter}>
                   <SelectTrigger size="sm" className="w-40">
@@ -541,54 +595,15 @@ export function LiveComparisonViewer({
               ) : null}
             </>
           )}
+          {actions}
         </div>
-      </div>
-
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        {site.proxyOrigin ? (
-          onViaProxyChange ? (
-            <Select value={useProxy ? "proxy" : "direct"} onValueChange={(v) => handleViaProxyChange(v === "proxy")}>
-              <SelectTrigger size="sm" className="h-6 w-auto gap-1 px-2 text-xs" title="How the site is loaded">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="proxy">Preview proxy — no setup</SelectItem>
-                <SelectItem value="direct">Direct — needs the snippet</SelectItem>
-              </SelectContent>
-            </Select>
-          ) : (
-            <span className="rounded border border-border px-1.5 py-0.5">{useProxy ? "Preview proxy" : "Direct"}</span>
-          )
-        ) : null}
-        <span className="rounded border border-border px-1.5 py-0.5 font-mono">{site.viewportWidth}px</span>
-        <span className="min-w-0 truncate font-mono" title={currentUrl}>
-          {currentUrl}
-        </span>
-        <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
-          <a href={currentUrl} target="_blank" rel="noopener noreferrer" title="Open in a new tab">
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={() => liveHandle.current?.reload()}
-          title="Reload the site"
-        >
-          <RotateCw className="h-3.5 w-3.5" />
-        </Button>
-        {otherPagePins > 0 ? (
-          <span className="shrink-0">
-            · {otherPagePins} pin{otherPagePins === 1 ? "" : "s"} on other pages
-          </span>
-        ) : null}
       </div>
 
       <div
         ref={rootRef}
         className={cn(
-          "relative flex h-[70vh] overflow-hidden rounded-lg border border-border",
+          // Full bleed: cancel the page's p-6 on the sides and bottom.
+          "relative -mx-6 -mb-6 flex min-h-0 flex-1 overflow-hidden border-t border-border",
           // Room taken on the right by the floating comment panel, or its show button.
           "[&:has([data-comment-panel=open])]:[--comment-inset:21rem] [&:has([data-comment-panel=closed])]:[--comment-inset:5.5rem]",
           layout === "stacked" ? "flex-col" : "flex-row"
@@ -634,14 +649,6 @@ export function LiveComparisonViewer({
         {commentPanel}
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {mode === "comment"
-          ? "Comment mode: click any element on the site, or a spot on the design, to pin it · "
-          : "Browse mode: use the site normally · "}
-        Scroll either side to move both · Pinch or ⌘-scroll to zoom the design · Shortcuts: C comment/browse, S
-        sync, F fit design
-        {useProxy ? " · Page look wrong? Switch to Direct and add the snippet to the site" : null}
-      </p>
     </div>
   );
 }

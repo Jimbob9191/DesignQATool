@@ -76,6 +76,7 @@ export function ComparisonWorkspace({
   teamMembers,
   canModerate = true,
   initialSelectedId = null,
+  actions,
 }: {
   comparisonId: string;
   design: ComparisonImage;
@@ -87,11 +88,14 @@ export function ComparisonWorkspace({
   canModerate?: boolean;
   // Pin to open on load, e.g. when arriving from a search result.
   initialSelectedId?: string | null;
+  /** At the far right of the toolbar. */
+  actions: React.ReactNode;
 }) {
   const [annotations, setAnnotations] = useState<WorkspaceAnnotation[]>(initialAnnotations);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [viaProxy, setViaProxy] = useState(live.kind === "site" && live.viaProxy);
   const [commentsOpen, setCommentsOpen] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<AnnotationStatus | "all">("all");
 
   // Remember whether the comment panel was hidden, so it stays out of the way
   // across comparisons. Read after mount to keep the server render stable.
@@ -411,7 +415,8 @@ export function ComparisonWorkspace({
   }
 
   const threads: AnnotationThread[] = annotations
-    .slice()
+    // The pin you're on stays, so it doesn't vanish as you change its status.
+    .filter((a) => statusFilter === "all" || a.status === statusFilter || a.id === selectedId)
     // Newest first, so a pin you've just dropped is at the top of the panel.
     .sort((a, b) => b.number - a.number)
     .map((a) => ({
@@ -443,13 +448,15 @@ export function ComparisonWorkspace({
       onUpdateComment={handleUpdateComment}
       onDeleteComment={handleDeleteComment}
       onClose={() => toggleComments(false)}
+      statusFilter={statusFilter}
+      onStatusFilterChange={setStatusFilter}
     />
   ) : (
     <ShowCommentsButton count={threads.length} onClick={() => toggleComments(true)} />
   );
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       {presentUsers.length > 1 ? (
         <div className="flex items-center gap-1 self-end">
           <span className="text-xs text-muted-foreground">Also viewing:</span>
@@ -472,7 +479,7 @@ export function ComparisonWorkspace({
         </div>
       ) : null}
 
-      <div className="min-w-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {live.kind === "capture" ? (
           <ComparisonViewer
             design={design}
@@ -484,6 +491,8 @@ export function ComparisonWorkspace({
             onDragAnnotation={canModerate ? handleDrag : undefined}
             elementMap={live.elementMap}
             commentPanel={commentPanel}
+            statusFilter={statusFilter}
+            actions={actions}
           />
         ) : (
           <LiveComparisonViewer
@@ -504,6 +513,8 @@ export function ComparisonWorkspace({
             onDragAnnotation={canModerate ? handleDrag : undefined}
             onViaProxyChange={canModerate ? handleViaProxyChange : undefined}
             commentPanel={commentPanel}
+            statusFilter={statusFilter}
+            actions={actions}
           />
         )}
       </div>
