@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { PlugZap, X } from "lucide-react";
 
 import {
@@ -277,16 +278,16 @@ function ConnectHelp({
   const viaProxy = connection?.viaProxy ?? false;
   const canSwitch = Boolean(connection?.onChange) && (viaProxy || connection?.proxyAvailable);
 
-  return (
-    // Keeps clear of the floating comment panel (see --comment-inset) while
-    // there's room for the card, and otherwise sits above it.
+  // Floats over the bottom right of the window like a toast, rather than
+  // covering the site it's about. Same offset as the app's toasts.
+  return createPortal(
     <div
-      className="absolute top-3 left-3 z-30 rounded-lg border border-border bg-background p-4 shadow-lg"
-      style={{ right: "clamp(0.75rem, var(--comment-inset, 0.75rem), 100% - 22rem)" }}
+      role="status"
+      className="fixed right-6 bottom-6 z-50 w-[602px] max-w-[calc(100vw-3rem)] rounded-lg border border-border bg-popover p-4 text-popover-foreground shadow-lg"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <PlugZap className="h-4 w-4 text-status-needs-review" />
+        <div className="flex items-start gap-2 text-sm font-medium">
+          <PlugZap className="mt-0.5 h-4 w-4 shrink-0 text-status-needs-review" />
           {viaProxy
             ? "This site didn’t load properly through the preview proxy"
             : "This page isn’t talking to DesignParity.app"}
@@ -318,7 +319,8 @@ function ConnectHelp({
           </Button>
         </div>
       ) : null}
-    </div>
+    </div>,
+    document.body
   );
 }
 
