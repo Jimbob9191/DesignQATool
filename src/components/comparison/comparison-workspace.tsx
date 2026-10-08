@@ -16,7 +16,6 @@ import { FORMER_MEMBER, guestAuthor } from "@/lib/authors";
 import { useComparisonRealtime } from "@/lib/realtime/use-comparison-realtime";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { TopbarPortal } from "@/components/app-shell/topbar-slot";
 import { AnnotationThread, CommentSidebar, ShowCommentsButton } from "@/components/comments/comment-sidebar";
 import type { TeamMemberOption } from "@/components/comments/comment-composer";
 import type { CommentData } from "@/components/comments/comment-item";
@@ -462,30 +461,35 @@ export function ComparisonWorkspace({
       onFiltersChange={setFilters}
       authorOptions={authorOptions}
     />
-  ) : (
+  ) : null;
+  // In the viewer's toolbar while the panel is hidden.
+  const showComments = commentsOpen ? null : (
     <ShowCommentsButton count={threads.length} onClick={() => toggleComments(true)} />
+  );
+
+  // Rendered by the viewer, after its view controls, so the order in the top bar is fixed.
+  const topbarEnd = (
+    <>
+      {otherViewers.length > 0 ? (
+        <div className="flex -space-x-2" aria-label="Also viewing">
+          {otherViewers.map((u) => (
+            <Tooltip key={u.userId}>
+              <TooltipTrigger asChild>
+                <Avatar className="h-7 w-7 border-2 border-background">
+                  <AvatarFallback className="text-[10px]">{u.email.slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{u.email} is viewing</TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+      ) : null}
+      {actions}
+    </>
   );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <TopbarPortal slot="end">
-        {otherViewers.length > 0 ? (
-          <div className="flex -space-x-2" aria-label="Also viewing">
-            {otherViewers.map((u) => (
-              <Tooltip key={u.userId}>
-                <TooltipTrigger asChild>
-                  <Avatar className="h-7 w-7 border-2 border-background">
-                    <AvatarFallback className="text-[10px]">{u.email.slice(0, 2).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">{u.email} is viewing</TooltipContent>
-              </Tooltip>
-            ))}
-          </div>
-        ) : null}
-        {actions}
-      </TopbarPortal>
-
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {live.kind === "capture" ? (
           <ComparisonViewer
@@ -498,6 +502,8 @@ export function ComparisonWorkspace({
             onDragAnnotation={canModerate ? handleDrag : undefined}
             elementMap={live.elementMap}
             commentPanel={commentPanel}
+            showComments={showComments}
+            topbarEnd={topbarEnd}
             filters={filters}
           />
         ) : (
@@ -519,6 +525,8 @@ export function ComparisonWorkspace({
             onDragAnnotation={canModerate ? handleDrag : undefined}
             onViaProxyChange={canModerate ? handleViaProxyChange : undefined}
             commentPanel={commentPanel}
+            showComments={showComments}
+            topbarEnd={topbarEnd}
             filters={filters}
           />
         )}

@@ -284,13 +284,7 @@ export function CommentSidebar({
 /** Floating button that brings the comment panel back once it's hidden. */
 export function ShowCommentsButton({ count, onClick }: { count: number; onClick: () => void }) {
   return (
-    <Button
-      data-pan-zoom-ignore
-      data-comment-panel="closed"
-      size="sm"
-      variant="outline"
-      className="absolute top-2 right-2 z-20 bg-background/85 text-foreground shadow-lg backdrop-blur-sm hover:bg-muted dark:border-border dark:bg-background/85 dark:hover:bg-muted"
-      onClick={onClick}
+    <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-xs" onClick={onClick}
       title="Show comments"
     >
       <MessageSquare className="h-4 w-4" />

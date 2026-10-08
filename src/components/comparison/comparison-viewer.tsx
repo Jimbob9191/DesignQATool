@@ -11,8 +11,9 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { TopbarPortal } from "@/components/app-shell/topbar-slot";
 import { ElementHoverHighlight } from "@/components/comparison/element-hover-highlight";
-import { LayoutTabs, SyncToggle, type Layout } from "@/components/comparison/layout-tabs";
+import { LayoutTabs, SyncToggle, ToolbarSeparator, type Layout } from "@/components/comparison/layout-tabs";
 import { matchesPinFilters, NO_PIN_FILTERS, type PinFilters } from "@/components/comparison/pin-filters";
 import { ImagePane, type ImagePaneHandle, type PaneTransform } from "@/components/comparison/image-pane";
 import { OverlayViewer } from "@/components/comparison/overlay-viewer";
@@ -50,6 +51,8 @@ export function ComparisonViewer({
   onDragAnnotation,
   elementMap,
   commentPanel,
+  showComments,
+  topbarEnd,
 }: {
   design: ComparisonImage;
   live: ComparisonImage;
@@ -67,6 +70,10 @@ export function ComparisonViewer({
   elementMap?: ElementMapEntry[];
   /** Floated over the right edge of the canvas. */
   commentPanel?: React.ReactNode;
+  /** Brings the comment panel back; at the right of the toolbar while it's hidden. */
+  showComments?: React.ReactNode;
+  /** Shown in the top bar after the view controls. */
+  topbarEnd?: React.ReactNode;
 }) {
   const [layout, setLayout] = useState<Layout>("side-by-side");
   const [singlePane, setSinglePane] = useState<PaneId>("design");
@@ -271,10 +278,19 @@ export function ComparisonViewer({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <TopbarPortal slot="end">
+        <div className="flex items-center gap-1">
+          <LayoutTabs value={layout} onValueChange={setLayout} />
+          {layout !== "overlay" && layout !== "swipe" ? (
+            <SyncToggle synced={syncLocked} onSyncedChange={setSyncLocked} />
+          ) : null}
+        </div>
+        <ToolbarSeparator />
+        {topbarEnd}
+      </TopbarPortal>
+
       {/* Same gutter as the top bar, and the same height while it fits on one line. */}
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
-        <LayoutTabs value={layout} onValueChange={setLayout} />
-
         {layout !== "overlay" && layout !== "swipe" ? (
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {layout === "single" ? (
@@ -288,7 +304,6 @@ export function ComparisonViewer({
             <span className="w-12 text-center text-sm text-muted-foreground" title="Zoom">
               {zoomPercent}%
             </span>
-            <SyncToggle synced={syncLocked} onSyncedChange={setSyncLocked} />
           </div>
         ) : null}
         <Tooltip>
@@ -316,6 +331,7 @@ export function ComparisonViewer({
             <p>Scroll to zoom. Hold space or middle-drag to pan.</p>
           </TooltipContent>
         </Tooltip>
+        {showComments}
       </div>
 
       {layout === "overlay" || layout === "swipe" ? (
@@ -343,9 +359,6 @@ export function ComparisonViewer({
                   className="relative shrink-0"
                 >
                   {designPane}
-                  <span className="pointer-events-none absolute left-2 top-2 rounded bg-background/80 px-2 py-0.5 text-xs font-medium">
-                    {design.label}
-                  </span>
                 </div>
 
                 <div
@@ -353,8 +366,11 @@ export function ComparisonViewer({
                   onPointerMove={handleSplitterPointerMove}
                   onPointerUp={handleSplitterPointerUp}
                   className={cn(
-                    "shrink-0 touch-none bg-border transition-colors hover:bg-primary/50",
-                    layout === "side-by-side" ? "w-1 cursor-col-resize" : "h-1 cursor-row-resize"
+                    // A 1px rule like the borders above, with a wider strip either side to grab.
+                    "relative z-10 shrink-0 touch-none bg-border transition-colors before:absolute before:content-[''] hover:bg-primary/50",
+                    layout === "side-by-side"
+                      ? "w-px cursor-col-resize before:inset-y-0 before:-inset-x-1.5"
+                      : "h-px cursor-row-resize before:inset-x-0 before:-inset-y-1.5"
                   )}
                 />
 

@@ -27,6 +27,7 @@ import { proxyOriginFor } from "@/lib/live/proxy";
 import { ComparisonWorkspace, type WorkspaceLiveSide } from "@/components/comparison/comparison-workspace";
 import { Breadcrumbs } from "@/components/app-shell/breadcrumbs";
 import { ComparisonActionsMenu } from "@/components/comparisons/comparison-actions-menu";
+import { ComparisonSwitcher } from "@/components/comparisons/comparison-switcher";
 import { RefreshCaptureButton } from "@/components/comparisons/refresh-capture-button";
 
 export default async function ComparisonDetailPage({
@@ -96,6 +97,7 @@ export default async function ComparisonDetailPage({
     teamMemberRows,
     shareLinkRows,
     designRows,
+    pageComparisons,
   ] = await Promise.all([
     capture
       ? db
@@ -148,6 +150,12 @@ export default async function ComparisonDetailPage({
           .where(and(eq(assets.teamId, team.id), eq(assets.kind, "design")))
           .orderBy(desc(assets.createdAt))
       : [],
+    // The page's comparisons, to switch between, in the order the page lists them.
+    db
+      .select({ id: comparisons.id, name: comparisons.name })
+      .from(comparisons)
+      .where(eq(comparisons.pageId, pageId))
+      .orderBy(desc(comparisons.createdAt)),
   ]);
 
   const designUrl = signedUrls.get(row.design.storagePath);
@@ -237,25 +245,11 @@ export default async function ComparisonDetailPage({
           { label: row.comparison.name },
         ]}
       >
-        <ComparisonActionsMenu
+        <ComparisonSwitcher
           comparisonId={comparisonId}
-          comparisonName={row.comparison.name}
-          projectSlug={projectSlug}
-          pageId={pageId}
-          canEdit={canEdit}
-          shareLinks={shareLinkOptions}
-          edit={{
-            current: {
-              name: row.comparison.name,
-              designAssetId: row.design.id,
-              live: capture
-                ? null
-                : { url: row.comparison.liveUrl!, viewportWidth: row.comparison.viewportWidth! },
-            },
-            designOptions,
-            designPinCount: initialAnnotations.filter((a) => a.target === "design").length,
-            sitePinCount: initialAnnotations.filter((a) => a.target === "live").length,
-          }}
+          pageName={row.page.name}
+          basePath={`/projects/${projectSlug}/${pageId}`}
+          comparisons={pageComparisons}
         />
       </Breadcrumbs>
       <ComparisonWorkspace
@@ -274,9 +268,31 @@ export default async function ComparisonDetailPage({
         teamMembers={teamMemberOptions}
         canModerate={canEdit}
         actions={
-          canEdit && hasNewerCapture && latestCapture ? (
-            <RefreshCaptureButton comparisonId={comparisonId} newCaptureAssetId={latestCapture.assetId} />
-          ) : null
+          <>
+            {canEdit && hasNewerCapture && latestCapture ? (
+              <RefreshCaptureButton comparisonId={comparisonId} newCaptureAssetId={latestCapture.assetId} />
+            ) : null}
+            <ComparisonActionsMenu
+              comparisonId={comparisonId}
+              comparisonName={row.comparison.name}
+              projectSlug={projectSlug}
+              pageId={pageId}
+              canEdit={canEdit}
+              shareLinks={shareLinkOptions}
+              edit={{
+                current: {
+                  name: row.comparison.name,
+                  designAssetId: row.design.id,
+                  live: capture
+                    ? null
+                    : { url: row.comparison.liveUrl!, viewportWidth: row.comparison.viewportWidth! },
+                },
+                designOptions,
+                designPinCount: initialAnnotations.filter((a) => a.target === "design").length,
+                sitePinCount: initialAnnotations.filter((a) => a.target === "live").length,
+              }}
+            />
+          </>
         }
       />
     </div>

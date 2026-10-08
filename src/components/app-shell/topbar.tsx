@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, Menu, ScanEye } from "lucide-react";
+import { Menu, ScanEye } from "lucide-react";
 
 import { NavLinks } from "@/components/app-shell/nav-links";
 import { SettingsMenu } from "@/components/app-shell/settings-menu";
@@ -16,7 +16,6 @@ import { cn } from "@/lib/utils";
 export function Topbar({ userEmail }: { userEmail: string }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const pathname = usePathname();
-  const backHref = backHrefFor(pathname);
   // The comparison page has no search.
   const showSearch = !isComparison(pathname);
 
@@ -46,14 +45,6 @@ export function Topbar({ userEmail }: { userEmail: string }) {
         </SheetContent>
       </Sheet>
 
-      {backHref ? (
-        <Button variant="ghost" size="icon" asChild>
-          <Link href={backHref} aria-label="Back" title="Back">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-      ) : null}
-
       <TopbarSlot name="start" className="flex min-w-0 items-center" />
 
       {/* Everything after this sits on the right. */}
@@ -73,15 +64,8 @@ export function Topbar({ userEmail }: { userEmail: string }) {
   );
 }
 
-const COMPARISON_PATH = /^(\/projects\/[^/]+\/[^/]+)\/compare\/[^/]+\/?$/;
+const COMPARISON_PATH = /^\/projects\/[^/]+\/[^/]+\/compare\/[^/]+\/?$/;
 
 function isComparison(pathname: string): boolean {
   return COMPARISON_PATH.test(pathname);
-}
-
-/** Pages that get a back button in the top bar, and where it goes. */
-function backHrefFor(pathname: string): string | null {
-  // A comparison goes back to its page.
-  const comparison = pathname.match(COMPARISON_PATH);
-  return comparison ? comparison[1] : null;
 }
