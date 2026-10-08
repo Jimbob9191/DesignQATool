@@ -4,7 +4,7 @@ export const PASSWORD_MIN_LENGTH = 8;
 
 const emailField = z.string().trim().email("Enter a valid email address");
 
-// Shared by every form that sets a password (post-signup setup, reset) so the rule can
+// Shared by every form that sets a password (post-signup setup, reset, change) so the rule can
 // only ever be changed in one place.
 const newPasswordField = z
   .string()
@@ -47,7 +47,23 @@ export const resetPasswordSchema = z
   })
   .refine(passwordsMatch, mismatchError());
 
+// Changing the password from settings: unlike the reset form, the session alone
+// isn't proof enough (it could be a laptop left unlocked), so the current
+// password is required too.
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Enter your current password"),
+    password: newPasswordField,
+    confirmPassword: confirmPasswordField,
+  })
+  .refine(passwordsMatch, mismatchError())
+  .refine((values) => values.password !== values.currentPassword, {
+    message: "Choose a password different from your current one",
+    path: ["password"],
+  });
+
 export type SignInSchema = z.infer<typeof signInSchema>;
 export type SignUpSchema = z.infer<typeof signUpSchema>;
 export type ForgotPasswordSchema = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordSchema = z.infer<typeof resetPasswordSchema>;
+export type ChangePasswordSchema = z.infer<typeof changePasswordSchema>;

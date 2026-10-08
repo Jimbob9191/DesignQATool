@@ -11,10 +11,11 @@ import {
   friendlyAuthError,
   safeNext,
   submittedEmail,
+  TOO_MANY_ATTEMPTS,
   type AuthFormState,
 } from "@/lib/auth/form-state";
 import { sendEmail } from "@/lib/email/resend";
-import { clientIp, consumeRateLimits } from "@/lib/rate-limit";
+import { clientIp, consumePasswordAttempt, consumeRateLimits } from "@/lib/rate-limit";
 import { passwordResetEmail, signupConfirmationEmail } from "@/lib/email/templates";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -24,8 +25,6 @@ import {
   signInSchema,
   signUpSchema,
 } from "@/lib/validations/auth";
-
-const TOO_MANY_ATTEMPTS = "Too many attempts. Wait a few minutes and try again.";
 
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
@@ -45,15 +44,7 @@ export async function signInWithPassword(
     return { status: "error", email, fieldErrors: fieldErrorsFrom(parsed.error) };
   }
 
-  // Supabase's own per-IP limit doesn't help here: every sign-in reaches it
-  // from this server, so all users share one bucket. Throttle per client IP
-  // (password spraying) and per account (guessing one person's password).
-  const ip = await clientIp();
-  const allowed = await consumeRateLimits([
-    [`signin:ip:${ip}`, 30, 10 * MINUTE],
-    [`signin:email:${parsed.data.email.toLowerCase()}`, 10, 10 * MINUTE],
-  ]);
-  if (!allowed) {
+  if (!(await consumePasswordAttempt(parsed.data.email))) {
     return { status: "error", email, message: TOO_MANY_ATTEMPTS };
   }
 
