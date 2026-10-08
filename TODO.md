@@ -23,17 +23,6 @@ Nothing open.
 
 ## P2 — real improvements
 
-### [ ] 12. Team settings: rename and delete a team
-**P2 · M · Touches:** `src/lib/actions/teams.ts`, `src/app/(app)/team/page.tsx`, new team-settings component
-
-**Problem:** Teams can be created but never renamed or deleted (there's no action for either). A mistyped team name is permanent.
-
-**Do:** add `renameTeam` (admin+) and `deleteTeam` (owner only, confirm by typing the team name). Deleting must also remove the team's storage objects (`<teamId>/…` in the `assets` bucket, listed and removed through the admin client), because the DB cascade only deletes rows. Don't allow deleting the user's last remaining team (or the personal team, if that's the intended model; check the signup trigger in `drizzle/0001_personal_team_on_signup.sql`). After deleting, clear `current_team_id` and redirect to `/dashboard`.
-
-**Done when:** an owner can rename and delete a team, and no orphaned storage objects are left behind.
-
----
-
 ### [ ] 13. Account settings: change password and delete account
 **P2 · M · Touches:** `src/app/(app)/settings/page.tsx`, `src/lib/actions/auth.ts` (or a new `account.ts`), new settings components
 
@@ -43,7 +32,7 @@ Nothing open.
 
 **Do:**
 - **Change password:** current password plus new password and confirm. Verify the current password with `signInWithPassword` before calling `updateUser`, and rate-limit it like sign-in. Reuse `resetPasswordSchema`'s rules.
-- **Delete account:** confirm by typing your email. Refuse while you're the sole owner of a team that has other members (tell them to transfer ownership first). Then delete teams where you're the only member (reusing task 12's storage cleanup if it's done), delete the auth user through the admin client, sign out, and redirect to `/login`.
+- **Delete account:** confirm by typing your email. Refuse while you're the sole owner of a team that has other members (tell them to transfer ownership first). Then delete teams where you're the only member (remove their Storage objects first with `removeTeamStorage()` from `src/lib/assets/team-storage.ts`, as `deleteTeam` does), delete the auth user through the admin client, sign out, and redirect to `/login`.
 
 **Done when:** both flows work end to end locally, with clear errors.
 
