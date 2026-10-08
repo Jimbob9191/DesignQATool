@@ -115,6 +115,18 @@ export function normalizePageUrl(url: string): string {
   }
 }
 
+/**
+ * Where to point the frame to show `realUrl` through the live-preview proxy:
+ * same-origin pages map straight across, anything else goes via its goto
+ * route. Pins and the address bar always deal in real-site URLs.
+ */
+export function proxiedFrameUrl(realUrl: string, siteOrigin: string, proxyOrigin: string): string {
+  const url = new URL(realUrl);
+  return url.origin === siteOrigin
+    ? proxyOrigin + url.pathname + url.search + url.hash
+    : `${proxyOrigin}/__dp/goto?url=${encodeURIComponent(realUrl)}`;
+}
+
 export function bridgeSnippet(appOrigin: string): string {
   return `<script src="${appOrigin}/bridge.js" async></script>`;
 }

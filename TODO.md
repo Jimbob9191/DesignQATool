@@ -74,23 +74,12 @@ Nothing open.
 
 ---
 
-### [ ] 16. Show pins on the shared (guest) view
-**P2 · M · Touches:** `src/app/share/[token]/page.tsx`, `src/components/share/share-thread.tsx`, possibly a small read-only pin overlay component
-
-**Problem:** The share page lists threads as "Pin #3", but never shows *where* the pins are: the design is a plain `<img>` (`share/page.tsx:121`), and the live pane gets `pins={[]}` (`:135`). Guests can't tell what a comment refers to.
-
-**Do:** draw numbered `PinMarker`s over the design image using `xRatio`/`yPx`, as an absolutely positioned overlay scaled to the rendered image width. Pass the live pins into `LivePane`; `pinAnchorFor` from `src/lib/live/anchor.ts` builds the anchors. Clicking a pin should scroll to its thread, and vice versa. Make it read-only: no dragging.
-
-**Done when:** a guest can see each numbered pin on both sides and jump between pins and threads.
-
----
-
 ### [ ] 17. Make the PDF export useful for live comparisons
 **P2 · M · Touches:** `src/app/print/comparison/[comparisonId]/page.tsx`, `src/lib/actions/export.ts`, `src/components/comparisons/export-pdf-button.tsx`, optionally a new route handler
 
 **Problem:** For live-site comparisons (the default now), the PDF contains the design image and a sentence with the URL (`print/page.tsx:132-137`). There are no pins on the design and no indication of where issues are, so the PDF is mostly a list of comments. The PDF also comes back to the browser as base64 inside a Server Action response, which inflates the payload by about 33% and buffers it entirely in memory.
 
-**Do:** overlay numbered pins on the design image in the print page (same math as task 16; share a component if 16 is done). For live pins, list element text and page URL (already there) next to the number. Move the download to a `GET /api/export/[comparisonId]` route handler that authorises the user, calls capture-service, and streams `application/pdf` with `Content-Disposition`. Change the button to a plain link/fetch.
+**Do:** overlay numbered pins on the design image in the print page (reuse `PinnedImage` from `src/components/comparison/pinned-image.tsx`, built for the share page). For live pins, list element text and page URL (already there) next to the number. Move the download to a `GET /api/export/[comparisonId]` route handler that authorises the user, calls capture-service, and streams `application/pdf` with `Content-Disposition`. Change the button to a plain link/fetch.
 
 **Conflicts/depends:** shares `export.ts` with task 8. Do it after that, or rebase.
 

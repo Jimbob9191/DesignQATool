@@ -18,7 +18,7 @@ import {
 
 import type { PanZoomState } from "@/hooks/use-pan-zoom";
 import { pinAnchorFor } from "@/lib/live/anchor";
-import { samePage, type LiveLayout, type LiveMode, type Rect } from "@/lib/live/protocol";
+import { proxiedFrameUrl, samePage, type LiveLayout, type LiveMode, type Rect } from "@/lib/live/protocol";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -122,10 +122,7 @@ export function LiveComparisonViewer({
   const toFrameUrl = useCallback(
     (realUrl: string) => {
       if (!useProxy || !site.proxyOrigin) return realUrl;
-      const url = new URL(realUrl);
-      return url.origin === siteOrigin
-        ? site.proxyOrigin + url.pathname + url.search + url.hash
-        : `${site.proxyOrigin}/__dp/goto?url=${encodeURIComponent(realUrl)}`;
+      return proxiedFrameUrl(realUrl, siteOrigin, site.proxyOrigin);
     },
     [useProxy, site.proxyOrigin, siteOrigin]
   );
