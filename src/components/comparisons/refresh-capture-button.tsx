@@ -38,9 +38,16 @@ export function RefreshCaptureButton({
   }
 
   return (
-    <Button variant="outline" onClick={handleClick} disabled={isSubmitting}>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleClick}
+      disabled={isSubmitting}
+      aria-label="Update to latest capture"
+      title="Update to latest capture"
+    >
       <RefreshCw className="h-4 w-4" />
-      Update to latest capture
+      <span className="hidden lg:inline">Update capture</span>
     </Button>
   );
 }

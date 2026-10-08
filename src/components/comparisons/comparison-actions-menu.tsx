@@ -51,7 +51,7 @@ export function ComparisonActionsMenu({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" aria-label="Comparison actions" title="Comparison actions">
+          <Button variant="ghost" size="icon" aria-label="Comparison actions" title="Comparison actions">
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>

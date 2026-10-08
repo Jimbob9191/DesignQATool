@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageSquare, MoreHorizontal, PanelRightClose, Trash2 } from "lucide-react";
+import { ListFilter, MessageSquare, MoreHorizontal, PanelRightClose, Trash2, X } from "lucide-react";
 
+import {
+  activePinFilterCount,
+  NO_PIN_FILTERS,
+  type PinFilters,
+} from "@/components/comparison/pin-filters";
 import type { AnnotationStatus } from "@/components/comparison/pin-marker";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +23,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { CommentComposer, type TeamMemberOption } from "@/components/comments/comment-composer";
 import { CommentItem, type CommentData } from "@/components/comments/comment-item";
@@ -64,8 +68,10 @@ export function CommentSidebar({
   onUpdateComment,
   onDeleteComment,
   onClose,
-  statusFilter,
-  onStatusFilterChange,
+  totalCount,
+  filters,
+  onFiltersChange,
+  authorOptions,
 }: {
   threads: AnnotationThread[];
   selectedId: string | null;
@@ -78,8 +84,12 @@ export function CommentSidebar({
   onUpdateComment: (annotationId: string, commentId: string, body: string) => void;
   onDeleteComment: (annotationId: string, commentId: string) => void;
   onClose?: () => void;
-  statusFilter: AnnotationStatus | "all";
-  onStatusFilterChange: (status: AnnotationStatus | "all") => void;
+  /** Pins before filtering. */
+  totalCount: number;
+  filters: PinFilters;
+  onFiltersChange: (filters: PinFilters) => void;
+  /** Everyone who has dropped a pin, to filter by. */
+  authorOptions: string[];
 }) {
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   // One editor open at a time: the selected pin's composer, or this comment's
@@ -92,6 +102,8 @@ export function CommentSidebar({
   // while the dialog animates away.
   const [confirmingDelete, setConfirmingDelete] = useState<AnnotationThread | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  const isFiltered = activePinFilterCount(filters) > 0;
 
   // Moving to another pin abandons an edit.
   useEffect(() => {
@@ -109,25 +121,15 @@ export function CommentSidebar({
       data-comment-panel="open"
       className="absolute inset-y-2 right-2 z-20 flex w-80 max-w-[calc(100%-1rem)] flex-col rounded-lg border border-border bg-background/85 shadow-lg backdrop-blur-sm"
     >
-      <div className="flex items-center gap-2 border-b border-border py-1 pr-1 pl-3">
+      {/* Icon buttons pull into the padding so their icons line up with the threads' menus. */}
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <p className="text-sm font-medium">
-          {threads.length} pin{threads.length === 1 ? "" : "s"}
+          {isFiltered ? `${threads.length} of ` : null}
+          {totalCount} pin{totalCount === 1 ? "" : "s"}
         </p>
-        <Select value={statusFilter} onValueChange={(v) => onStatusFilterChange(v as AnnotationStatus | "all")}>
-          <SelectTrigger size="sm" className="ml-auto h-7 w-auto gap-1 px-2 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            {STATUSES.map((status) => (
-              <SelectItem key={status} value={status}>
-                {STATUS_LABEL[status]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <PinFilterMenu filters={filters} onFiltersChange={onFiltersChange} authorOptions={authorOptions} />
         {onClose ? (
-          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onClose} title="Hide comments">
+          <Button size="icon" variant="ghost" className="-mr-1.5 h-7 w-7" onClick={onClose} title="Hide comments">
             <PanelRightClose className="h-4 w-4" />
           </Button>
         ) : null}
@@ -135,9 +137,7 @@ export function CommentSidebar({
       <ScrollArea className="min-h-0 flex-1">
         {threads.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">
-            {statusFilter === "all"
-              ? "Click either image to drop a pin and start a thread."
-              : `No pins are ${STATUS_LABEL[statusFilter].toLowerCase()}.`}
+            {isFiltered ? "No pins match these filters." : "Click either image to drop a pin and start a thread."}
           </p>
         ) : (
           threads.map((thread) => {
@@ -182,8 +182,8 @@ export function CommentSidebar({
                     {onStatusChange || (onDelete && thread.canDelete) ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button size="sm" variant="ghost" title="More actions">
-                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          <Button size="icon" variant="ghost" className="-my-1 -mr-1.5 h-7 w-7" title="More actions">
+                            <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40">
@@ -296,5 +296,103 @@ export function ShowCommentsButton({ count, onClick }: { count: number; onClick:
       <MessageSquare className="h-4 w-4" />
       {count}
     </Button>
+  );
+}
+
+/** Every pin filter in one menu, so the panel header stays a single line. */
+function PinFilterMenu({
+  filters,
+  onFiltersChange,
+  authorOptions,
+}: {
+  filters: PinFilters;
+  onFiltersChange: (filters: PinFilters) => void;
+  authorOptions: string[];
+}) {
+  const activeCount = activePinFilterCount(filters);
+
+  // Picking an option leaves the menu open, so several filters can be set in one go.
+  function keepOpen(event: Event) {
+    event.preventDefault();
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          size="sm"
+          variant={activeCount > 0 ? "secondary" : "ghost"}
+          className="ml-auto h-7 gap-1 px-2 text-xs"
+        >
+          <ListFilter className="h-3.5 w-3.5" />
+          Filter
+          {activeCount > 0 ? (
+            <span className="rounded-full bg-primary px-1.5 text-[10px] leading-4 text-primary-foreground">
+              {activeCount}
+            </span>
+          ) : null}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel>Status</DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={filters.status}
+          onValueChange={(status) => onFiltersChange({ ...filters, status: status as PinFilters["status"] })}
+        >
+          <DropdownMenuRadioItem value="all" onSelect={keepOpen}>
+            All statuses
+          </DropdownMenuRadioItem>
+          {STATUSES.map((status) => (
+            <DropdownMenuRadioItem key={status} value={status} onSelect={keepOpen}>
+              {STATUS_LABEL[status]}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Pinned on</DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={filters.target}
+          onValueChange={(target) => onFiltersChange({ ...filters, target: target as PinFilters["target"] })}
+        >
+          <DropdownMenuRadioItem value="all" onSelect={keepOpen}>
+            Design and live
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="design" onSelect={keepOpen}>
+            Design
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="live" onSelect={keepOpen}>
+            Live
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+        {authorOptions.length > 1 || filters.author !== "all" ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Author</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={filters.author}
+              onValueChange={(author) => onFiltersChange({ ...filters, author })}
+            >
+              <DropdownMenuRadioItem value="all" onSelect={keepOpen}>
+                Anyone
+              </DropdownMenuRadioItem>
+              {authorOptions.map((email) => (
+                <DropdownMenuRadioItem key={email} value={email} onSelect={keepOpen}>
+                  <span className="truncate">{email}</span>
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </>
+        ) : null}
+        {activeCount > 0 ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => onFiltersChange(NO_PIN_FILTERS)}>
+              <X />
+              Clear filters
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

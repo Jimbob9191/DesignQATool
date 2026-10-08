@@ -58,10 +58,16 @@ export function Topbar({ userEmail }: { userEmail: string }) {
         </Button>
       ) : null}
 
-      <TopbarSlot className="flex min-w-0 items-center" />
+      <TopbarSlot name="start" className="flex min-w-0 items-center" />
 
       {/* Everything after this sits on the right. */}
       <div className="flex-1" />
+
+      {/* Page actions, set apart from the app-wide controls by a rule. Hidden when the page has none. */}
+      <TopbarSlot
+        name="end"
+        className="flex shrink-0 items-center gap-2 border-r border-border pr-3 empty:hidden"
+      />
 
       <GlobalSearch />
 

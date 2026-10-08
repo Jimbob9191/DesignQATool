@@ -1,20 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Blend,
-  Columns2,
-  ExternalLink,
-  Link2,
-  Link2Off,
-  MessageSquarePlus,
-  MousePointer2,
-  MoveHorizontal,
-  RotateCw,
-  Rows2,
-  SquareStack,
-  SquaresIntersect,
-} from "lucide-react";
+import { Blend, ExternalLink, MessageSquarePlus, MousePointer2, RotateCw } from "lucide-react";
 
 import type { PanZoomState } from "@/hooks/use-pan-zoom";
 import { pinAnchorFor } from "@/lib/live/anchor";
@@ -33,9 +20,11 @@ import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AnnotationData, ComparisonImage } from "@/components/comparison/comparison-viewer";
+import { LayoutTabs, SyncToggle, type Layout } from "@/components/comparison/layout-tabs";
+import { matchesPinFilters, type PinFilters } from "@/components/comparison/pin-filters";
 import { ImagePane, type ImagePaneHandle, type PaneTransform } from "@/components/comparison/image-pane";
 import { LivePane, type LivePaneHandle, type LivePick, type LiveTransform } from "@/components/comparison/live-pane";
-import { PinMarker, type AnnotationStatus } from "@/components/comparison/pin-marker";
+import { PinMarker } from "@/components/comparison/pin-marker";
 
 export type LiveSite = {
   url: string;
@@ -54,7 +43,6 @@ export type LiveAnnotationData = AnnotationData & {
   pageUrl: string | null;
 };
 
-type Layout = "side-by-side" | "stacked" | "single" | "overlay" | "swipe";
 type PaneId = "design" | "live";
 
 const INITIAL_VIEW: PanZoomState = { scale: 1, tx: 0, ty: 0 };
@@ -68,14 +56,13 @@ export function LiveComparisonViewer({
   snippet,
   annotations,
   selectedAnnotationId,
-  statusFilter,
+  filters,
   onSelectAnnotation,
   onCreateDesignAnnotation,
   onCreateLiveAnnotation,
   onDragAnnotation,
   onViaProxyChange,
   commentPanel,
-  actions,
 }: {
   design: ComparisonImage;
   site: LiveSite;
@@ -83,7 +70,7 @@ export function LiveComparisonViewer({
   annotations: LiveAnnotationData[];
   selectedAnnotationId: string | null;
   /** Set from the comment panel. */
-  statusFilter: AnnotationStatus | "all";
+  filters: PinFilters;
   onSelectAnnotation: (id: string) => void;
   onCreateDesignAnnotation?: (point: { x: number; y: number }) => void;
   onCreateLiveAnnotation?: (pick: LivePick) => void;
@@ -91,8 +78,6 @@ export function LiveComparisonViewer({
   onViaProxyChange?: (viaProxy: boolean) => void;
   /** Floated over the right edge of the canvas. */
   commentPanel?: React.ReactNode;
-  /** At the far right of the toolbar. */
-  actions?: React.ReactNode;
 }) {
   const [layout, setLayout] = useState<Layout>("side-by-side");
   const [singlePane, setSinglePane] = useState<PaneId>("live");
@@ -107,8 +92,6 @@ export function LiveComparisonViewer({
   const [opacity, setOpacity] = useState(50);
   const [blendDifference, setBlendDifference] = useState(false);
   const [dividerPercent, setDividerPercent] = useState(50);
-  const [paneFilter, setPaneFilter] = useState<PaneId | "all">("all");
-  const [authorFilter, setAuthorFilter] = useState<string>("all");
 
   const rootRef = useRef<HTMLDivElement>(null);
   const designHandle = useRef<ImagePaneHandle | null>(null);
@@ -251,21 +234,11 @@ export function LiveComparisonViewer({
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
   }
 
-  const authorOptions = useMemo(
-    () => Array.from(new Set(annotations.map((a) => a.authorEmail))),
-    [annotations]
-  );
-
   const visibleAnnotations = useMemo(
     () =>
-      annotations.filter(
-        (a) =>
-          // The pin you're on stays, so it doesn't vanish as you change its status.
-          (statusFilter === "all" || a.status === statusFilter || a.id === selectedAnnotationId) &&
-          (paneFilter === "all" || a.target === paneFilter) &&
-          (authorFilter === "all" || a.authorEmail === authorFilter)
-      ),
-    [annotations, statusFilter, selectedAnnotationId, paneFilter, authorFilter]
+      // The pin you're on stays, so it doesn't vanish as you change its status.
+      annotations.filter((a) => a.id === selectedAnnotationId || matchesPinFilters(a, filters)),
+    [annotations, filters, selectedAnnotationId]
   );
 
   const trackedPins = useMemo(
@@ -414,94 +387,74 @@ export function LiveComparisonViewer({
   ).length;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Tabs value={layout} onValueChange={(v) => setLayout(v as Layout)}>
-            <TabsList>
-              <TabsTrigger value="side-by-side">
-                <Columns2 className="h-4 w-4" />
-                Side by side
-              </TabsTrigger>
-              <TabsTrigger value="stacked">
-                <Rows2 className="h-4 w-4" />
-                Stacked
-              </TabsTrigger>
-              <TabsTrigger value="single">
-                <SquareStack className="h-4 w-4" />
-                Single
-              </TabsTrigger>
-              <TabsTrigger value="overlay">
-                <SquaresIntersect className="h-4 w-4" />
-                Overlay
-              </TabsTrigger>
-              <TabsTrigger value="swipe">
-                <MoveHorizontal className="h-4 w-4" />
-                Swipe
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Same gutter as the top bar, and the same height while it fits on one line. */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+        <LayoutTabs value={layout} onValueChange={setLayout} />
 
-          {onCreateLiveAnnotation ? (
-            <Tooltip delayDuration={500}>
-              <TooltipTrigger asChild>
-                <Tabs value={mode} onValueChange={(v) => setMode(v as LiveMode)}>
-                  <TabsList>
-                    <TabsTrigger value="comment">
-                      <MessageSquarePlus className="h-4 w-4" />
-                      Comment
-                    </TabsTrigger>
-                    <TabsTrigger value="browse">
-                      <MousePointer2 className="h-4 w-4" />
-                      Browse
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="flex-col items-start gap-1">
-                <p>Comment: click any element on the site, or a spot on the design, to pin it.</p>
-                <p>Browse: use the site normally.</p>
-                <p>Scroll either side to move both. Pinch or ⌘-scroll to zoom the design.</p>
-                <p>Shortcuts: C comment/browse, S sync, F fit design.</p>
-                {useProxy ? <p>Page look wrong? Switch to Direct and add the snippet to the site.</p> : null}
-              </TooltipContent>
-            </Tooltip>
-          ) : null}
-        </div>
+        {onCreateLiveAnnotation ? (
+          <Tooltip delayDuration={500}>
+            <TooltipTrigger asChild>
+              <Tabs value={mode} onValueChange={(v) => setMode(v as LiveMode)}>
+                <TabsList>
+                  <TabsTrigger value="comment">
+                    <MessageSquarePlus className="h-4 w-4" />
+                    Comment
+                  </TabsTrigger>
+                  <TabsTrigger value="browse">
+                    <MousePointer2 className="h-4 w-4" />
+                    Browse
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="flex-col items-start gap-1">
+              <p>Comment: click any element on the site, or a spot on the design, to pin it.</p>
+              <p>Browse: use the site normally.</p>
+              <p>Scroll either side to move both. Pinch or ⌘-scroll to zoom the design.</p>
+              <p>Shortcuts: C comment/browse, S sync, F fit design.</p>
+              {useProxy ? <p>Page look wrong? Switch to Direct and add the snippet to the site.</p> : null}
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
 
-        {/* Takes the room between the two groups; wraps to its own line below 12rem. */}
-        <div className="flex min-w-48 flex-1 basis-0 items-center gap-2 text-xs text-muted-foreground">
-          {site.proxyOrigin ? (
-            onViaProxyChange ? (
-              <Select
-                value={useProxy ? "proxy" : "direct"}
-                onValueChange={(v) => handleViaProxyChange(v === "proxy")}
+        {/* An address bar for the framed site. It takes the room left over and
+            wraps onto its own line rather than squeezing the URL to nothing. */}
+        <div className="flex h-8 min-w-72 flex-1 basis-72 items-center gap-1 overflow-hidden rounded-lg border border-border pr-1 text-xs text-muted-foreground">
+          {site.proxyOrigin && onViaProxyChange ? (
+            <Select
+              value={useProxy ? "proxy" : "direct"}
+              onValueChange={(v) => handleViaProxyChange(v === "proxy")}
+            >
+              <SelectTrigger
+                size="sm"
+                className="h-full shrink-0 gap-1 rounded-none border-0 border-r border-border px-2 text-xs shadow-none dark:bg-transparent"
+                title="How the site is loaded"
               >
-                <SelectTrigger
-                  size="sm"
-                  className="h-6 w-auto shrink-0 gap-1 px-2 text-xs"
-                  title="How the site is loaded"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="proxy">Preview proxy — no setup</SelectItem>
-                  <SelectItem value="direct">Direct — needs the snippet</SelectItem>
-                </SelectContent>
-              </Select>
-            ) : (
-              <span className="shrink-0 rounded border border-border px-1.5 py-0.5">
-                {useProxy ? "Preview proxy" : "Direct"}
-              </span>
-            )
+                <SelectValue>{useProxy ? "Proxy" : "Direct"}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="proxy">Preview proxy — no setup</SelectItem>
+                <SelectItem value="direct">Direct — needs the snippet</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : site.proxyOrigin ? (
+            <span className="flex h-full shrink-0 items-center border-r border-border px-2">
+              {useProxy ? "Proxy" : "Direct"}
+            </span>
           ) : null}
-          <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono">
-            {site.viewportWidth}px
-          </span>
-          <span className="min-w-0 truncate font-mono" title={currentUrl}>
+          <span className="min-w-0 flex-1 truncate pl-2 font-mono text-foreground" title={currentUrl}>
             {currentUrl}
           </span>
-          <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+          {otherPagePins > 0 ? (
+            <span className="shrink-0" title="Pins on other pages of the site">
+              +{otherPagePins} on other pages
+            </span>
+          ) : null}
+          <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono" title="Viewport width">
+            {site.viewportWidth}px
+          </span>
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" asChild>
             <a href={currentUrl} target="_blank" rel="noopener noreferrer" title="Open in a new tab">
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
@@ -509,101 +462,48 @@ export function LiveComparisonViewer({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
+            className="h-6 w-6 shrink-0"
             onClick={() => liveHandle.current?.reload()}
             title="Reload the site"
           >
             <RotateCw className="h-3.5 w-3.5" />
           </Button>
-          {otherPagePins > 0 ? (
-            <span className="shrink-0">
-              · {otherPagePins} pin{otherPagePins === 1 ? "" : "s"} on other pages
-            </span>
-          ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {isOverlayLayout ? (
-            <>
-              {layout === "overlay" ? (
-                <div className="flex w-44 items-center gap-2">
-                  <Label className="shrink-0 text-xs text-muted-foreground">Design</Label>
-                  <Slider
-                    value={[opacity]}
-                    onValueChange={([v]) => setOpacity(v)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                </div>
-              ) : null}
-              <Button
-                variant={blendDifference ? "secondary" : "outline"}
-                size="sm"
-                onClick={() => setBlendDifference((prev) => !prev)}
-                title="Show the difference between design and site"
-              >
-                <Blend className="h-4 w-4" />
-                Difference
-              </Button>
-            </>
-          ) : (
-            <>
-              <Select value={paneFilter} onValueChange={(v) => setPaneFilter(v as PaneId | "all")}>
-                <SelectTrigger size="sm" className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All panes</SelectItem>
-                  <SelectItem value="design">{design.label}</SelectItem>
-                  <SelectItem value="live">{site.label}</SelectItem>
-                </SelectContent>
-              </Select>
-              {authorOptions.length > 1 ? (
-                <Select value={authorFilter} onValueChange={setAuthorFilter}>
-                  <SelectTrigger size="sm" className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All authors</SelectItem>
-                    {authorOptions.map((email) => (
-                      <SelectItem key={email} value={email}>
-                        {email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : null}
-              {layout === "single" ? (
-                <Tabs value={singlePane} onValueChange={(v) => setSinglePane(v as PaneId)}>
-                  <TabsList>
-                    <TabsTrigger value="design">{design.label}</TabsTrigger>
-                    <TabsTrigger value="live">{site.label}</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              ) : null}
-              {layout !== "single" ? (
-                <Button
-                  variant={syncLocked ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={() => setSyncLocked((prev) => !prev)}
-                  title="Scroll the design with the site (S)"
-                >
-                  {syncLocked ? <Link2 className="h-4 w-4" /> : <Link2Off className="h-4 w-4" />}
-                  {syncLocked ? "Synced" : "Unsynced"}
-                </Button>
-              ) : null}
-            </>
-          )}
-          {actions}
-        </div>
+        {layout === "overlay" ? (
+          <div className="flex w-40 items-center gap-2">
+            <Label className="shrink-0 text-xs text-muted-foreground">Design</Label>
+            <Slider value={[opacity]} onValueChange={([v]) => setOpacity(v)} min={0} max={100} step={1} />
+          </div>
+        ) : null}
+        {isOverlayLayout ? (
+          <Button
+            variant={blendDifference ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setBlendDifference((prev) => !prev)}
+            title="Show the difference between design and site"
+          >
+            <Blend className="h-4 w-4" />
+            Difference
+          </Button>
+        ) : null}
+        {layout === "single" ? (
+          <Tabs value={singlePane} onValueChange={(v) => setSinglePane(v as PaneId)}>
+            <TabsList>
+              <TabsTrigger value="design">{design.label}</TabsTrigger>
+              <TabsTrigger value="live">{site.label}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        ) : null}
+        {layout === "side-by-side" || layout === "stacked" ? (
+          <SyncToggle synced={syncLocked} onSyncedChange={setSyncLocked} />
+        ) : null}
       </div>
 
       <div
         ref={rootRef}
         className={cn(
-          // Full bleed: cancel the page's p-6 on the sides and bottom.
-          "relative -mx-6 -mb-6 flex min-h-0 flex-1 overflow-hidden border-t border-border",
+          "relative flex min-h-0 flex-1 overflow-hidden",
           // Room taken on the right by the floating comment panel, or its show button.
           "[&:has([data-comment-panel=open])]:[--comment-inset:21rem] [&:has([data-comment-panel=closed])]:[--comment-inset:5.5rem]",
           layout === "stacked" ? "flex-col" : "flex-row"

@@ -1,0 +1,799 @@
+{
+  "version": 2,
+  "components": {
+    "Button": {
+      "props": {
+        "variant": {
+          "type": "enum",
+          "values": [
+            "default",
+            "outline",
+            "secondary",
+            "ghost",
+            "destructive",
+            "link"
+          ],
+          "default": "default",
+          "class_map": {
+            "default": "bg-primary text-primary-foreground",
+            "outline": "border-border bg-background",
+            "secondary": "bg-secondary text-secondary-foreground",
+            "ghost": "hover:bg-muted",
+            "destructive": "bg-destructive/10 text-destructive",
+            "link": "text-primary underline-offset-4"
+          }
+        },
+        "size": {
+          "type": "enum",
+          "values": [
+            "default",
+            "xs",
+            "sm",
+            "lg",
+            "icon",
+            "icon-xs",
+            "icon-sm",
+            "icon-lg"
+          ],
+          "default": "default",
+          "class_map": {
+            "default": "h-8 gap-1.5 px-2.5",
+            "xs": "h-6 gap-1 px-2 text-xs",
+            "sm": "h-7 gap-1 px-2.5 text-[0.8rem]",
+            "lg": "h-9 gap-1.5 px-2.5",
+            "icon": "size-8",
+            "icon-xs": "size-6",
+            "icon-sm": "size-7",
+            "icon-lg": "size-9"
+          }
+        },
+        "disabled": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "Badge": {
+      "props": {
+        "variant": {
+          "type": "enum",
+          "values": [
+            "default",
+            "secondary",
+            "destructive",
+            "outline",
+            "ghost",
+            "link"
+          ],
+          "default": "default",
+          "class_map": {
+            "default": "bg-primary text-primary-foreground",
+            "secondary": "bg-secondary text-secondary-foreground",
+            "destructive": "bg-destructive/10 text-destructive",
+            "outline": "border-border text-foreground",
+            "ghost": "hover:bg-muted",
+            "link": "text-primary underline-offset-4"
+          }
+        }
+      }
+    },
+    "Card": {
+      "props": {
+        "size": {
+          "type": "enum",
+          "values": [
+            "default",
+            "sm"
+          ],
+          "default": "default"
+        }
+      }
+    },
+    "Avatar": {
+      "props": {
+        "size": {
+          "type": "enum",
+          "values": [
+            "default",
+            "sm",
+            "lg"
+          ],
+          "default": "default"
+        }
+      }
+    },
+    "Input": {
+      "props": {
+        "placeholder": {
+          "type": "string"
+        },
+        "disabled": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "Textarea": {
+      "props": {
+        "placeholder": {
+          "type": "string"
+        },
+        "disabled": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "Checkbox": {
+      "props": {
+        "checked": {
+          "type": "boolean",
+          "default": false
+        },
+        "disabled": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "Slider": {
+      "props": {
+        "min": {
+          "type": "number",
+          "default": 0
+        },
+        "max": {
+          "type": "number",
+          "default": 100
+        },
+        "step": {
+          "type": "number",
+          "default": 1
+        },
+        "disabled": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "Separator": {
+      "props": {
+        "orientation": {
+          "type": "enum",
+          "values": [
+            "horizontal",
+            "vertical"
+          ],
+          "default": "horizontal"
+        }
+      }
+    },
+    "Tabs": {
+      "props": {
+        "orientation": {
+          "type": "enum",
+          "values": [
+            "horizontal",
+            "vertical"
+          ],
+          "default": "horizontal"
+        }
+      }
+    },
+    "TabsList": {
+      "props": {
+        "variant": {
+          "type": "enum",
+          "values": [
+            "default",
+            "line"
+          ],
+          "default": "default",
+          "class_map": {
+            "default": "bg-muted",
+            "line": "gap-1 bg-transparent"
+          }
+        }
+      }
+    },
+    "TabsTrigger": {
+      "props": {
+        "disabled": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "SelectTrigger": {
+      "props": {
+        "size": {
+          "type": "enum",
+          "values": [
+            "sm",
+            "default"
+          ],
+          "default": "default"
+        },
+        "disabled": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "SelectContent": {
+      "props": {
+        "position": {
+          "type": "enum",
+          "values": [
+            "item-aligned",
+            "popper"
+          ],
+          "default": "item-aligned"
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "start",
+            "center",
+            "end"
+          ],
+          "default": "center",
+          "hidden_unless": {
+            "position": "popper"
+          }
+        }
+      }
+    },
+    "DropdownMenuContent": {
+      "props": {
+        "align": {
+          "type": "enum",
+          "values": [
+            "start",
+            "center",
+            "end"
+          ],
+          "default": "start"
+        },
+        "sideOffset": {
+          "type": "number",
+          "default": 4
+        }
+      }
+    },
+    "DropdownMenuItem": {
+      "props": {
+        "variant": {
+          "type": "enum",
+          "values": [
+            "default",
+            "destructive"
+          ],
+          "default": "default"
+        },
+        "inset": {
+          "type": "boolean",
+          "default": false
+        },
+        "disabled": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "DropdownMenuLabel": {
+      "props": {
+        "inset": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "PopoverContent": {
+      "props": {
+        "align": {
+          "type": "enum",
+          "values": [
+            "start",
+            "center",
+            "end"
+          ],
+          "default": "center"
+        },
+        "sideOffset": {
+          "type": "number",
+          "default": 4
+        }
+      }
+    },
+    "TooltipContent": {
+      "props": {
+        "side": {
+          "type": "enum",
+          "values": [
+            "top",
+            "right",
+            "bottom",
+            "left"
+          ],
+          "default": "top"
+        },
+        "sideOffset": {
+          "type": "number",
+          "default": 0
+        }
+      }
+    },
+    "DialogContent": {
+      "props": {
+        "showCloseButton": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "DialogFooter": {
+      "props": {
+        "showCloseButton": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "AlertDialogContent": {
+      "props": {
+        "size": {
+          "type": "enum",
+          "values": [
+            "default",
+            "sm"
+          ],
+          "default": "default"
+        }
+      }
+    },
+    "AlertDialogAction": {
+      "props": {
+        "variant": {
+          "type": "enum",
+          "values": [
+            "default",
+            "outline",
+            "secondary",
+            "ghost",
+            "destructive",
+            "link"
+          ],
+          "default": "default",
+          "class_map": {
+            "default": "bg-primary text-primary-foreground",
+            "outline": "border-border bg-background",
+            "secondary": "bg-secondary text-secondary-foreground",
+            "ghost": "hover:bg-muted",
+            "destructive": "bg-destructive/10 text-destructive",
+            "link": "text-primary underline-offset-4"
+          }
+        },
+        "size": {
+          "type": "enum",
+          "values": [
+            "default",
+            "xs",
+            "sm",
+            "lg",
+            "icon",
+            "icon-xs",
+            "icon-sm",
+            "icon-lg"
+          ],
+          "default": "default",
+          "class_map": {
+            "default": "h-8 gap-1.5 px-2.5",
+            "xs": "h-6 gap-1 px-2 text-xs",
+            "sm": "h-7 gap-1 px-2.5 text-[0.8rem]",
+            "lg": "h-9 gap-1.5 px-2.5",
+            "icon": "size-8",
+            "icon-xs": "size-6",
+            "icon-sm": "size-7",
+            "icon-lg": "size-9"
+          }
+        }
+      }
+    },
+    "AlertDialogCancel": {
+      "props": {
+        "variant": {
+          "type": "enum",
+          "values": [
+            "default",
+            "outline",
+            "secondary",
+            "ghost",
+            "destructive",
+            "link"
+          ],
+          "default": "outline",
+          "class_map": {
+            "default": "bg-primary text-primary-foreground",
+            "outline": "border-border bg-background",
+            "secondary": "bg-secondary text-secondary-foreground",
+            "ghost": "hover:bg-muted",
+            "destructive": "bg-destructive/10 text-destructive",
+            "link": "text-primary underline-offset-4"
+          }
+        },
+        "size": {
+          "type": "enum",
+          "values": [
+            "default",
+            "xs",
+            "sm",
+            "lg",
+            "icon",
+            "icon-xs",
+            "icon-sm",
+            "icon-lg"
+          ],
+          "default": "default",
+          "class_map": {
+            "default": "h-8 gap-1.5 px-2.5",
+            "xs": "h-6 gap-1 px-2 text-xs",
+            "sm": "h-7 gap-1 px-2.5 text-[0.8rem]",
+            "lg": "h-9 gap-1.5 px-2.5",
+            "icon": "size-8",
+            "icon-xs": "size-6",
+            "icon-sm": "size-7",
+            "icon-lg": "size-9"
+          }
+        }
+      }
+    },
+    "SheetContent": {
+      "props": {
+        "side": {
+          "type": "enum",
+          "values": [
+            "top",
+            "right",
+            "bottom",
+            "left"
+          ],
+          "default": "right"
+        },
+        "showCloseButton": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "Sidebar": {
+      "props": {
+        "defaultCollapsed": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "state": {
+        "collapsed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Sidebar shrunk to icons only"
+        }
+      }
+    },
+    "NavLinks": {
+      "props": {
+        "collapsed": {
+          "type": "boolean",
+          "default": false,
+          "class_map": {
+            "true": "justify-center px-2",
+            "false": "gap-3 px-3"
+          }
+        }
+      }
+    },
+    "Topbar": {
+      "props": {
+        "userEmail": {
+          "type": "string",
+          "description": "Shown as initials in the account avatar"
+        }
+      },
+      "state": {
+        "mobileNavOpen": {
+          "type": "boolean",
+          "default": false,
+          "description": "Mobile navigation sheet open"
+        }
+      }
+    },
+    "TeamSwitcher": {
+      "state": {
+        "createOpen": {
+          "type": "boolean",
+          "default": false,
+          "description": "Create-team dialog open"
+        }
+      }
+    },
+    "GlobalSearch": {
+      "state": {
+        "value": {
+          "type": "string",
+          "default": "",
+          "description": "Search query"
+        },
+        "open": {
+          "type": "boolean",
+          "default": false,
+          "description": "Results dropdown open"
+        }
+      }
+    },
+    "PinMarker": {
+      "props": {
+        "number": {
+          "type": "number",
+          "default": 1
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "open",
+            "resolved",
+            "wont_fix",
+            "needs_review"
+          ],
+          "default": "open",
+          "class_map": {
+            "open": "bg-status-open text-status-open-foreground border-status-open",
+            "resolved": "bg-status-resolved text-status-resolved-foreground border-status-resolved opacity-70",
+            "wont_fix": "bg-status-wont-fix text-status-wont-fix-foreground border-status-wont-fix opacity-70",
+            "needs_review": "bg-status-needs-review text-status-needs-review-foreground border-status-needs-review"
+          }
+        },
+        "selected": {
+          "type": "boolean",
+          "default": false,
+          "class_map": {
+            "true": "ring-2 ring-ring ring-offset-2 ring-offset-background"
+          }
+        },
+        "detached": {
+          "type": "boolean",
+          "default": false,
+          "class_map": {
+            "true": "border-dashed opacity-60"
+          }
+        }
+      }
+    },
+    "LayoutTabs": {
+      "props": {
+        "value": {
+          "type": "enum",
+          "values": [
+            "side-by-side",
+            "stacked",
+            "single",
+            "overlay",
+            "swipe"
+          ],
+          "default": "side-by-side"
+        }
+      }
+    },
+    "SyncToggle": {
+      "props": {
+        "synced": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "ShowCommentsButton": {
+      "props": {
+        "count": {
+          "type": "number",
+          "default": 0
+        }
+      }
+    },
+    "CommentItem": {
+      "props": {
+        "isEditing": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "CommentComposer": {
+      "props": {
+        "placeholder": {
+          "type": "string"
+        }
+      }
+    },
+    "ComparisonActionsMenu": {
+      "props": {
+        "canEdit": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "state": {
+        "openDialog": {
+          "type": "enum",
+          "values": [
+            "share",
+            "edit",
+            "delete"
+          ],
+          "description": "Which dialog is open, if any"
+        }
+      }
+    },
+    "BridgeSnippet": {
+      "props": {
+        "snippet": {
+          "type": "string"
+        }
+      },
+      "state": {
+        "copied": {
+          "type": "boolean",
+          "default": false,
+          "description": "Copy button shows the copied confirmation"
+        }
+      }
+    },
+    "ShareThread": {
+      "props": {
+        "selected": {
+          "type": "boolean",
+          "default": false,
+          "class_map": {
+            "true": "border-ring ring-1 ring-ring"
+          }
+        },
+        "allowComments": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "AssetCard": {
+      "props": {
+        "canEdit": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "UploadDropzone": {
+      "state": {
+        "isDragging": {
+          "type": "boolean",
+          "default": false,
+          "class_map": {
+            "true": "border-primary bg-primary/5",
+            "false": "border-border"
+          },
+          "description": "File dragged over the drop zone"
+        }
+      }
+    },
+    "MemberRow": {
+      "props": {
+        "canManage": {
+          "type": "boolean",
+          "default": false
+        },
+        "isCallerOwner": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "ConfirmDeleteDialog": {
+      "props": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "open": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "DeleteAccountDialog": {
+      "state": {
+        "open": {
+          "type": "boolean",
+          "default": false,
+          "description": "Confirmation dialog open"
+        }
+      }
+    }
+  },
+  "tokens": {
+    "typography": {
+      "font-sans": {
+        "value": "\"Geist\", \"Geist Fallback\", ui-sans-serif, system-ui, sans-serif",
+        "variable": "--font-sans"
+      },
+      "font-mono": {
+        "value": "\"Geist Mono\", \"Geist Mono Fallback\", ui-monospace, monospace",
+        "variable": "--font-mono"
+      }
+    },
+    "radii": {
+      "radius-sm": {
+        "value": "calc(var(--radius) * 0.6)",
+        "variable": "--radius-sm"
+      },
+      "radius-md": {
+        "value": "calc(var(--radius) * 0.8)",
+        "variable": "--radius-md"
+      },
+      "radius-xl": {
+        "value": "calc(var(--radius) * 1.4)",
+        "variable": "--radius-xl"
+      },
+      "radius-2xl": {
+        "value": "calc(var(--radius) * 1.8)",
+        "variable": "--radius-2xl"
+      },
+      "radius-3xl": {
+        "value": "calc(var(--radius) * 2.2)",
+        "variable": "--radius-3xl"
+      },
+      "radius-4xl": {
+        "value": "calc(var(--radius) * 2.6)",
+        "variable": "--radius-4xl"
+      },
+      "radius": {
+        "value": "0.625rem",
+        "variable": "--radius"
+      }
+    },
+    "colors": {
+      "primary": {
+        "value": "oklch(0.922 0 0)",
+        "variable": "--primary"
+      },
+      "primary-foreground": {
+        "value": "oklch(0.205 0 0)",
+        "variable": "--primary-foreground"
+      },
+      "secondary": {
+        "value": "oklch(0.269 0 0)",
+        "variable": "--secondary"
+      },
+      "secondary-foreground": {
+        "value": "oklch(0.985 0 0)",
+        "variable": "--secondary-foreground"
+      },
+      "accent": {
+        "value": "oklch(0.269 0 0)",
+        "variable": "--accent"
+      },
+      "accent-foreground": {
+        "value": "oklch(0.985 0 0)",
+        "variable": "--accent-foreground"
+      },
+      "background": {
+        "value": "oklch(0.145 0 0)",
+        "variable": "--background"
+      },
+      "foreground": {
+        "value": "oklch(0.985 0 0)",
+        "variable": "--foreground"
+      }
+    }
+  }
+}
