@@ -6,25 +6,14 @@ import { usePathname } from "next/navigation";
 import { ArrowLeft, Menu, ScanEye } from "lucide-react";
 
 import { NavLinks } from "@/components/app-shell/nav-links";
+import { SettingsMenu } from "@/components/app-shell/settings-menu";
 import { TopbarSlot } from "@/components/app-shell/topbar-slot";
 import { GlobalSearch } from "@/components/search/global-search";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { signOut } from "@/lib/actions/auth";
 
 export function Topbar({ userEmail }: { userEmail: string }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const initials = userEmail.slice(0, 2).toUpperCase();
   const backHref = backHrefFor(usePathname());
 
   return (
@@ -35,7 +24,7 @@ export function Topbar({ userEmail }: { userEmail: string }) {
             <Menu className="h-5 w-5" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-0">
+        <SheetContent side="left" className="w-64 gap-0 p-0">
           <SheetHeader className="h-14 justify-center border-b border-border px-4">
             <SheetTitle asChild>
               <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
@@ -44,8 +33,11 @@ export function Topbar({ userEmail }: { userEmail: string }) {
               </Link>
             </SheetTitle>
           </SheetHeader>
-          <div className="p-3">
+          <div className="flex-1 overflow-y-auto p-3">
             <NavLinks onNavigate={() => setMobileNavOpen(false)} />
+          </div>
+          <div className="border-t border-border p-3">
+            <SettingsMenu userEmail={userEmail} onNavigate={() => setMobileNavOpen(false)} />
           </div>
         </SheetContent>
       </Sheet>
@@ -70,36 +62,6 @@ export function Topbar({ userEmail }: { userEmail: string }) {
       />
 
       <GlobalSearch />
-
-      <ThemeToggle />
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback>{initials}</AvatarFallback>
-            </Avatar>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel className="truncate font-normal text-muted-foreground">
-            {userEmail}
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <Link href="/settings">Settings</Link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={(event) => {
-              event.preventDefault();
-              void signOut();
-            }}
-          >
-            Sign out
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </header>
   );
 }

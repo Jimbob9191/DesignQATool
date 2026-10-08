@@ -15,7 +15,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-full min-h-screen w-full">
-      <Sidebar currentTeamId={team.id} teams={teamOptions} defaultCollapsed={sidebarCollapsed} />
+      <Sidebar
+        currentTeamId={team.id}
+        teams={teamOptions}
+        defaultCollapsed={sidebarCollapsed}
+        userEmail={user.email ?? "Unknown"}
+      />
       <TopbarSlotProvider>
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar userEmail={user.email ?? "Unknown"} />
