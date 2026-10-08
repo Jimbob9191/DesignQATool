@@ -11,10 +11,14 @@ import { TopbarSlot } from "@/components/app-shell/topbar-slot";
 import { GlobalSearch } from "@/components/search/global-search";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 
 export function Topbar({ userEmail }: { userEmail: string }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const backHref = backHrefFor(usePathname());
+  const pathname = usePathname();
+  const backHref = backHrefFor(pathname);
+  // The comparison page has no search.
+  const showSearch = !isComparison(pathname);
 
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -55,20 +59,29 @@ export function Topbar({ userEmail }: { userEmail: string }) {
       {/* Everything after this sits on the right. */}
       <div className="flex-1" />
 
-      {/* Page actions, set apart from the app-wide controls by a rule. Hidden when the page has none. */}
+      {/* Page actions, set apart from search by a rule. Hidden when the page has none. */}
       <TopbarSlot
         name="end"
-        className="flex shrink-0 items-center gap-2 border-r border-border pr-3 empty:hidden"
+        className={cn(
+          "flex shrink-0 items-center gap-2 empty:hidden",
+          showSearch && "border-r border-border pr-3",
+        )}
       />
 
-      <GlobalSearch />
+      {showSearch ? <GlobalSearch /> : null}
     </header>
   );
+}
+
+const COMPARISON_PATH = /^(\/projects\/[^/]+\/[^/]+)\/compare\/[^/]+\/?$/;
+
+function isComparison(pathname: string): boolean {
+  return COMPARISON_PATH.test(pathname);
 }
 
 /** Pages that get a back button in the top bar, and where it goes. */
 function backHrefFor(pathname: string): string | null {
   // A comparison goes back to its page.
-  const comparison = pathname.match(/^(\/projects\/[^/]+\/[^/]+)\/compare\/[^/]+\/?$/);
+  const comparison = pathname.match(COMPARISON_PATH);
   return comparison ? comparison[1] : null;
 }
