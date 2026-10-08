@@ -83,6 +83,11 @@ app.register(async (secured) => {
 
     try {
       const pdf = await runPdf(parsed.data.url);
+      // The app asks for raw bytes so it can stream them straight on to the
+      // browser; base64 in JSON is kept for callers that don't ask.
+      if (request.headers.accept?.includes("application/pdf")) {
+        return reply.type("application/pdf").send(pdf);
+      }
       return reply.send({ pdf: pdf.toString("base64") });
     } catch (error) {
       request.log.error(error);

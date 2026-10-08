@@ -63,19 +63,6 @@ Nothing open.
 
 ---
 
-### [ ] 17. Make the PDF export useful for live comparisons
-**P2 · M · Touches:** `src/app/print/comparison/[comparisonId]/page.tsx`, `src/lib/actions/export.ts`, `src/components/comparisons/export-pdf-button.tsx`, optionally a new route handler
-
-**Problem:** For live-site comparisons (the default now), the PDF contains the design image and a sentence with the URL (`print/page.tsx:132-137`). There are no pins on the design and no indication of where issues are, so the PDF is mostly a list of comments. The PDF also comes back to the browser as base64 inside a Server Action response, which inflates the payload by about 33% and buffers it entirely in memory.
-
-**Do:** overlay numbered pins on the design image in the print page (reuse `PinnedImage` from `src/components/comparison/pinned-image.tsx`, built for the share page). For live pins, list element text and page URL (already there) next to the number. Move the download to a `GET /api/export/[comparisonId]` route handler that authorises the user, calls capture-service, and streams `application/pdf` with `Content-Disposition`. Change the button to a plain link/fetch.
-
-**Conflicts/depends:** shares `export.ts` with task 8. Do it after that, or rebase.
-
-**Done when:** exported PDFs show numbered pins on the design, and the download is a streamed response.
-
----
-
 ### [ ] 18. Wrap multi-step writes in transactions
 **P2 · S–M · Touches:** `src/lib/actions/{teams,invitations,comparisons,annotations}.ts`
 

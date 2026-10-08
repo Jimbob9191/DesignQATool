@@ -9,6 +9,8 @@ import { db } from "@/lib/db";
 import { annotations, assets, comments, comparisons, pages, projects } from "@/lib/db/schema";
 import { verifyComparisonExportToken } from "@/lib/exports/sign";
 
+import { PinnedImage, type PrintPin } from "./pinned-image";
+
 export default async function PrintComparisonPage({
   params,
   searchParams,
@@ -79,6 +81,8 @@ export default async function PrintComparisonPage({
     number: index + 1,
     status: r.annotation.status,
     target: r.annotation.target,
+    xRatio: Number(r.annotation.xRatio),
+    yPx: r.annotation.yPx,
     elementText: r.annotation.elementText,
     pageUrl: r.annotation.pageUrl,
     comments: commentRows
@@ -88,6 +92,9 @@ export default async function PrintComparisonPage({
         body: c.comment.body,
       })),
   }));
+
+  const designPins: PrintPin[] = issues.filter((issue) => issue.target === "design");
+  const livePins: PrintPin[] = issues.filter((issue) => issue.target === "live");
 
   return (
     <div
@@ -114,26 +121,17 @@ export default async function PrintComparisonPage({
       <div style={{ display: "flex", gap: 16, marginTop: 24 }}>
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: 12, fontWeight: "bold", marginBottom: 6 }}>Design</p>
-          {/* eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URL fetched by Playwright, not the app UI */}
-          <img
-            src={designUrl}
-            alt="Design"
-            style={{ width: "100%", height: "auto", border: "1px solid #ddd" }}
-          />
+          <PinnedImage src={designUrl} alt="Design" height={row.design.height} pins={designPins} />
         </div>
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: 12, fontWeight: "bold", marginBottom: 6 }}>Live</p>
           {captureUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URL fetched by Playwright, not the app UI
-            <img
-              src={captureUrl}
-              alt="Live"
-              style={{ width: "100%", height: "auto", border: "1px solid #ddd" }}
-            />
+            <PinnedImage src={captureUrl} alt="Live" height={row.capture?.height ?? null} pins={livePins} />
           ) : (
-            <p style={{ fontSize: 13, color: "#555", marginTop: 0, wordBreak: "break-all" }}>
+            <p style={{ fontSize: 13, color: "#555", marginTop: 0, overflowWrap: "anywhere" }}>
               Reviewed on the live site at {row.comparison.viewportWidth}px wide:{" "}
               {row.comparison.liveUrl}
+              {livePins.length > 0 ? ". Its pins are listed below with the element each is attached to." : null}
             </p>
           )}
         </div>
@@ -156,13 +154,17 @@ export default async function PrintComparisonPage({
                   ({issue.status.replace("_", " ")})
                 </span>
               </p>
-              {issue.target === "live" && (issue.elementText || issue.pageUrl) ? (
-                <p style={{ fontSize: 12, color: "#555", marginTop: 4, marginBottom: 0, wordBreak: "break-all" }}>
-                  {issue.elementText ? `“${issue.elementText}”` : null}
-                  {issue.elementText && issue.pageUrl ? " on " : null}
-                  {issue.pageUrl}
-                </p>
-              ) : null}
+              <p style={{ fontSize: 12, color: "#555", marginTop: 4, marginBottom: 0, overflowWrap: "anywhere" }}>
+                {issue.target === "design" ? (
+                  "On the design"
+                ) : (
+                  <>
+                    On the live site
+                    {issue.elementText ? `: “${issue.elementText}”` : null}
+                    {issue.pageUrl ? ` at ${issue.pageUrl}` : null}
+                  </>
+                )}
+              </p>
               {issue.comments.length === 0 ? (
                 <p style={{ fontSize: 13, color: "#777", marginTop: 4 }}>No comments.</p>
               ) : (

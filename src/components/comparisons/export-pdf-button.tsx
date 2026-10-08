@@ -4,17 +4,7 @@ import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { exportComparisonPdf } from "@/lib/actions/export";
 import { Button } from "@/components/ui/button";
-
-function base64ToBlob(base64: string, mime: string): Blob {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return new Blob([bytes], { type: mime });
-}
 
 export function ExportPdfButton({
   comparisonId,
@@ -25,17 +15,27 @@ export function ExportPdfButton({
 }) {
   const [isExporting, setIsExporting] = useState(false);
 
+  // A fetch rather than a bare link so the button can show progress while the
+  // PDF renders (it takes several seconds) and turn a failure into a toast
+  // instead of navigating to a JSON error.
   async function handleExport() {
     setIsExporting(true);
     try {
-      const result = await exportComparisonPdf(comparisonId);
-      if (!result.success) {
-        toast.error(result.error);
+      const response = await fetch(`/api/export/${comparisonId}`);
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        toast.error(data.error ?? `PDF export failed (${response.status}).`);
         return;
       }
 
-      const blob = base64ToBlob(result.data.pdfBase64, "application/pdf");
-      const url = URL.createObjectURL(blob);
+      // A session that expired meanwhile is redirected to the login page,
+      // which arrives as a 200 HTML response rather than an error.
+      if (!response.headers.get("content-type")?.startsWith("application/pdf")) {
+        toast.error("Your session has expired. Sign in again to export.");
+        return;
+      }
+
+      const url = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = url;
       link.download = `${comparisonName.replace(/[^a-z0-9-_]+/gi, "-")}.pdf`;
