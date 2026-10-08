@@ -6,8 +6,11 @@ import { TopbarPortal } from "@/components/app-shell/topbar-slot";
 
 export type Crumb = { label: string; href?: string };
 
-/** Shows the trail in the top bar. The last crumb is the current page. */
-export function Breadcrumbs({ items }: { items: Crumb[] }) {
+/**
+ * Shows the trail in the top bar. The last crumb is the current page; children,
+ * if given, stand in for its label, e.g. a menu of actions on the page.
+ */
+export function Breadcrumbs({ items, children }: { items: Crumb[]; children?: React.ReactNode }) {
   return (
     <TopbarPortal>
       <nav aria-label="Breadcrumb" className="min-w-0">
@@ -22,7 +25,9 @@ export function Breadcrumbs({ items }: { items: Crumb[] }) {
                 key={index}
                 className={cn("min-w-0 items-center gap-1.5", isLast ? "flex" : "hidden shrink-[4] md:flex")}
               >
-                {item.href && !isLast ? (
+                {isLast && children ? (
+                  children
+                ) : item.href && !isLast ? (
                   <Link
                     href={item.href}
                     className="max-w-48 truncate text-muted-foreground transition-colors hover:text-foreground"

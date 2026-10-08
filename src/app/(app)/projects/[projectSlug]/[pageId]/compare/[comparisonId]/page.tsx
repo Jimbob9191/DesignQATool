@@ -236,7 +236,28 @@ export default async function ComparisonDetailPage({
           { label: row.page.name, href: `/projects/${projectSlug}/${pageId}` },
           { label: row.comparison.name },
         ]}
-      />
+      >
+        <ComparisonActionsMenu
+          comparisonId={comparisonId}
+          comparisonName={row.comparison.name}
+          projectSlug={projectSlug}
+          pageId={pageId}
+          canEdit={canEdit}
+          shareLinks={shareLinkOptions}
+          edit={{
+            current: {
+              name: row.comparison.name,
+              designAssetId: row.design.id,
+              live: capture
+                ? null
+                : { url: row.comparison.liveUrl!, viewportWidth: row.comparison.viewportWidth! },
+            },
+            designOptions,
+            designPinCount: initialAnnotations.filter((a) => a.target === "design").length,
+            sitePinCount: initialAnnotations.filter((a) => a.target === "live").length,
+          }}
+        />
+      </Breadcrumbs>
       <ComparisonWorkspace
         comparisonId={comparisonId}
         design={{
@@ -253,31 +274,9 @@ export default async function ComparisonDetailPage({
         teamMembers={teamMemberOptions}
         canModerate={canEdit}
         actions={
-          <>
-            {canEdit && hasNewerCapture && latestCapture ? (
-              <RefreshCaptureButton comparisonId={comparisonId} newCaptureAssetId={latestCapture.assetId} />
-            ) : null}
-            <ComparisonActionsMenu
-              comparisonId={comparisonId}
-              comparisonName={row.comparison.name}
-              projectSlug={projectSlug}
-              pageId={pageId}
-              canEdit={canEdit}
-              shareLinks={shareLinkOptions}
-              edit={{
-                current: {
-                  name: row.comparison.name,
-                  designAssetId: row.design.id,
-                  live: capture
-                    ? null
-                    : { url: row.comparison.liveUrl!, viewportWidth: row.comparison.viewportWidth! },
-                },
-                designOptions,
-                designPinCount: initialAnnotations.filter((a) => a.target === "design").length,
-                sitePinCount: initialAnnotations.filter((a) => a.target === "live").length,
-              }}
-            />
-          </>
+          canEdit && hasNewerCapture && latestCapture ? (
+            <RefreshCaptureButton comparisonId={comparisonId} newCaptureAssetId={latestCapture.assetId} />
+          ) : null
         }
       />
     </div>
