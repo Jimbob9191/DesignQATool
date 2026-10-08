@@ -13,10 +13,37 @@ import { db } from "@/lib/db";
 import { invitations, teamMembers } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email/resend";
 import { invitationEmail } from "@/lib/email/templates";
-import { env } from "@/lib/env";
+import { invitationAcceptUrl } from "@/lib/invitations";
 import { consumeRateLimits } from "@/lib/rate-limit";
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Each invite or resend emails an arbitrary address from our domain, so both
+// count against the same budget.
+function consumeInviteRateLimits(inviterId: string, teamId: string): Promise<boolean> {
+  return consumeRateLimits([
+    [`invite:user:${inviterId}`, 20, 60 * 60],
+    [`invite:team:${teamId}`, 50, 60 * 60],
+  ]);
+}
+
+function sendInvitationEmail(input: {
+  to: string;
+  token: string;
+  inviterLabel: string;
+  teamName: string;
+  role: string;
+}) {
+  return sendEmail({
+    to: input.to,
+    ...invitationEmail({
+      inviterLabel: input.inviterLabel,
+      teamName: input.teamName,
+      role: input.role,
+      acceptUrl: invitationAcceptUrl(input.token),
+    }),
+  });
+}
 
 const inviteSchema = z.object({
   email: z.string().trim().email(),
@@ -37,11 +64,7 @@ export async function inviteMember(input: unknown): Promise<ActionResult<{ id: s
 
   const email = parsed.data.email.toLowerCase();
 
-  // Each invite emails an arbitrary address from our domain.
-  const allowed = await consumeRateLimits([
-    [`invite:user:${inviter.id}`, 20, 60 * 60],
-    [`invite:team:${team.id}`, 50, 60 * 60],
-  ]);
+  const allowed = await consumeInviteRateLimits(inviter.id, team.id);
   if (!allowed) {
     return { success: false, error: "Too many invites sent recently. Try again in an hour." };
   }
@@ -80,15 +103,12 @@ export async function inviteMember(input: unknown): Promise<ActionResult<{ id: s
     })
     .returning({ id: invitations.id });
 
-  const acceptUrl = `${env.NEXT_PUBLIC_SITE_URL}/invite/accept?token=${token}`;
-  const emailResult = await sendEmail({
+  const emailResult = await sendInvitationEmail({
     to: email,
-    ...invitationEmail({
-      inviterLabel: inviter.email ?? "Someone",
-      teamName: team.name,
-      role: parsed.data.role,
-      acceptUrl,
-    }),
+    token,
+    inviterLabel: inviter.email ?? "Someone",
+    teamName: team.name,
+    role: parsed.data.role,
   });
 
   revalidatePath("/team");
@@ -103,6 +123,52 @@ export async function inviteMember(input: unknown): Promise<ActionResult<{ id: s
     };
   }
   return { success: true, data: invitation };
+}
+
+/**
+ * Re-sends a pending invite's email and restarts its expiry clock, for when
+ * the first email bounced, got lost, or sat unread until the link expired.
+ * The token is kept, so a link an admin already shared by hand keeps working.
+ */
+export async function resendInvitation(invitationId: string): Promise<ActionResult<true>> {
+  if (!isUuid(invitationId)) return { success: false, error: "Invite not found." };
+
+  const auth = await authorizeTeamRole("admin");
+  if (!auth.success) return auth;
+  const { team } = auth.data;
+  const inviter = await getCurrentUser();
+  if (!inviter) return { success: false, error: "Not signed in." };
+
+  const allowed = await consumeInviteRateLimits(inviter.id, team.id);
+  if (!allowed) {
+    return { success: false, error: "Too many invites sent recently. Try again in an hour." };
+  }
+
+  const [invitation] = await db
+    .update(invitations)
+    .set({ expiresAt: new Date(Date.now() + INVITATION_TTL_MS) })
+    .where(and(eq(invitations.id, invitationId), eq(invitations.teamId, team.id), eq(invitations.status, "pending")))
+    .returning({ email: invitations.email, role: invitations.role, token: invitations.token });
+  if (!invitation) return { success: false, error: "That invite was already accepted or revoked." };
+
+  const emailResult = await sendInvitationEmail({
+    to: invitation.email,
+    token: invitation.token,
+    inviterLabel: inviter.email ?? "Someone",
+    teamName: team.name,
+    role: invitation.role,
+  });
+
+  revalidatePath("/team");
+
+  if (!emailResult.sent) {
+    return {
+      success: true,
+      data: true,
+      warning: `Invite extended, but the email failed to send: ${emailResult.error}`,
+    };
+  }
+  return { success: true, data: true };
 }
 
 export async function revokeInvitation(invitationId: string): Promise<ActionResult<true>> {

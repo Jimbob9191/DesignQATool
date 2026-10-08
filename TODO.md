@@ -38,17 +38,6 @@ Nothing open.
 
 ---
 
-### [ ] 14. Invitations: resend, and copy the invite link
-**P2 · S · Touches:** `src/lib/actions/invitations.ts`, `src/components/team/invitation-row.tsx`
-
-**Problem:** If an invite email bounces or gets lost, the only way to recover is to revoke it and re-invite. The UI also hides the invite link, so admins can't paste it into Slack.
-
-**Do:** add `resendInvitation(id)` (admin+). It should extend `expiresAt` and resend the email, counted against the same rate limits as `inviteMember`. Add "Resend" and "Copy link" buttons to each pending invitation row, and show when each invite expires.
-
-**Done when:** an admin can resend an invite or copy its link from `/team`.
-
----
-
 ### [ ] 18. Wrap multi-step writes in transactions
 **P2 · S–M · Touches:** `src/lib/actions/{teams,invitations,comparisons,annotations}.ts`
 

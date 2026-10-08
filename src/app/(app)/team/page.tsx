@@ -4,6 +4,7 @@ import { authUsers } from "drizzle-orm/supabase";
 import { getCurrentTeam, getUserTeams } from "@/lib/auth/team";
 import { db } from "@/lib/db";
 import { invitations, teamMembers } from "@/lib/db/schema";
+import { invitationAcceptUrl } from "@/lib/invitations";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InviteMemberDialog } from "@/components/team/invite-member-dialog";
 import { InvitationRow } from "@/components/team/invitation-row";
@@ -12,6 +13,18 @@ import { LeaveTeamButton } from "@/components/team/leave-team-button";
 import { DeleteTeamButton, RenameTeamForm } from "@/components/team/team-settings";
 import { Button } from "@/components/ui/button";
 import { UserPlus } from "lucide-react";
+
+// Worked out here rather than in the client row, so the server and browser
+// clocks can't disagree and trip a hydration mismatch.
+function expiryLabel(expiresAt: Date): string {
+  const ms = expiresAt.getTime() - Date.now();
+  if (ms <= 0) return "Expired — resend to reactivate";
+  const hours = Math.floor(ms / (60 * 60 * 1000));
+  if (hours < 1) return "Expires in under an hour";
+  if (hours < 24) return `Expires in ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `Expires in ${days} day${days === 1 ? "" : "s"}`;
+}
 
 export default async function TeamPage() {
   const { team, role } = await getCurrentTeam();
@@ -26,7 +39,13 @@ export default async function TeamPage() {
       .orderBy(asc(teamMembers.createdAt)),
     canManage
       ? db
-          .select({ id: invitations.id, email: invitations.email, role: invitations.role })
+          .select({
+            id: invitations.id,
+            email: invitations.email,
+            role: invitations.role,
+            token: invitations.token,
+            expiresAt: invitations.expiresAt,
+          })
           .from(invitations)
           .where(and(eq(invitations.teamId, team.id), eq(invitations.status, "pending")))
           .orderBy(desc(invitations.createdAt))
@@ -81,7 +100,17 @@ export default async function TeamPage() {
           </CardHeader>
           <CardContent className="flex flex-col divide-y divide-border">
             {pendingInvitations.map((invitation) => (
-              <InvitationRow key={invitation.id} invitation={invitation} />
+              <InvitationRow
+                key={invitation.id}
+                invitation={{
+                  id: invitation.id,
+                  email: invitation.email,
+                  role: invitation.role,
+                  acceptUrl: invitationAcceptUrl(invitation.token),
+                  expiryLabel: expiryLabel(invitation.expiresAt),
+                  expired: invitation.expiresAt.getTime() <= Date.now(),
+                }}
+              />
             ))}
           </CardContent>
         </Card>
