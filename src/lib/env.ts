@@ -15,6 +15,10 @@ export const env = createEnv({
     // means comparisons can only frame sites directly, via the snippet.
     LIVE_PROXY_DOMAIN: z.string().min(1).optional(),
     LIVE_PROXY_SECRET: z.string().min(16).optional(),
+    // Encrypts users' Figma tokens at rest (src/lib/figma/crypto.ts): 32
+    // random bytes, base64 — `openssl rand -base64 32`. Unset hides Figma
+    // import entirely. Rotating it disconnects everyone, who then reconnect.
+    FIGMA_TOKEN_KEY: z.string().min(40).optional(),
     RESEND_API_KEY: z.string().min(1).optional(),
     // "Name <address>" on a domain verified in Resend. Unset falls back to
     // Resend's sandbox sender, which only delivers to the account owner.

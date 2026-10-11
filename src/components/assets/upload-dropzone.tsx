@@ -10,6 +10,8 @@ import { readImageDimensions } from "@/lib/assets/read-image-dimensions";
 import { ALLOWED_ASSET_MIME_TYPES, MAX_ASSET_SIZE_BYTES } from "@/lib/validations/asset";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import type { FigmaImportState } from "@/lib/figma/connection";
+import { ImportFigmaDialog } from "@/components/assets/import-figma-dialog";
 
 type UploadState = {
   file: File;
@@ -17,7 +19,13 @@ type UploadState = {
   error?: string;
 };
 
-export function UploadDropzone({ defaultPageId = null }: { defaultPageId?: string | null }) {
+export function UploadDropzone({
+  defaultPageId = null,
+  figma = "disabled",
+}: {
+  defaultPageId?: string | null;
+  figma?: FigmaImportState;
+}) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -133,6 +141,17 @@ export function UploadDropzone({ defaultPageId = null }: { defaultPageId?: strin
           <span className="text-muted-foreground"> or drag and drop</span>
         </div>
         <p className="text-xs text-muted-foreground">PNG, JPG, WebP, GIF, or SVG — up to 25MB</p>
+        {figma !== "disabled" ? (
+          <ImportFigmaDialog
+            connected={figma === "connected"}
+            defaultPageId={defaultPageId}
+            trigger={
+              <button type="button" className="text-sm font-medium text-primary hover:underline">
+                Or import a frame from Figma
+              </button>
+            }
+          />
+        ) : null}
         <input
           ref={inputRef}
           type="file"

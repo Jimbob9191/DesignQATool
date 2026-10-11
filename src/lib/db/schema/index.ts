@@ -11,3 +11,4 @@ export * from "./comments";
 export * from "./share-links";
 export * from "./user-preferences";
 export * from "./rate-limits";
+export * from "./figma-connections";

@@ -1,9 +1,13 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { deleteAsset, setAssetPage } from "@/lib/actions/assets";
+import { resyncFigmaAsset } from "@/lib/actions/figma";
+import type { FigmaImportState } from "@/lib/figma/connection";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { RenameAssetDialog } from "@/components/assets/rename-asset-dialog";
-import { Pencil, Trash2 } from "lucide-react";
+import { ExternalLink, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react";
 
 export type AssetCardData = {
   id: string;
@@ -27,6 +31,8 @@ export type AssetCardData = {
   height: number | null;
   pageId: string | null;
   signedUrl: string | null;
+  /** Set for designs imported from Figma: the frame they were rendered from. */
+  figmaUrl: string | null;
   // Comparisons built on this asset, which deleting it deletes too.
   comparisonNames: string[];
 };
@@ -58,12 +64,32 @@ export function AssetCard({
   asset,
   pageOptions,
   canEdit = true,
+  figma = "disabled",
 }: {
   asset: AssetCardData;
   pageOptions: PageOption[];
   canEdit?: boolean;
+  /** The viewer's own Figma connection, which re-syncing uses. */
+  figma?: FigmaImportState;
 }) {
   const router = useRouter();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  async function handleResync() {
+    setIsSyncing(true);
+    const result = await resyncFigmaAsset(asset.id);
+    setIsSyncing(false);
+    if (!result.success) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(
+      result.data.dimensionsChanged
+        ? "Re-synced. The frame changed size, so pins on the design may have moved."
+        : "Re-synced from Figma"
+    );
+    router.refresh();
+  }
 
   async function handlePageChange(value: string) {
     const result = await setAssetPage(asset.id, value === "unassigned" ? null : value);
@@ -95,7 +121,7 @@ export function AssetCard({
             {asset.name}
           </p>
           <Badge variant="outline" className="shrink-0 capitalize">
-            {asset.kind}
+            {asset.figmaUrl ? "Figma" : asset.kind}
           </Badge>
         </div>
         {asset.width && asset.height ? (
@@ -121,6 +147,35 @@ export function AssetCard({
             ))}
           </SelectContent>
         </Select>
+
+        {asset.figmaUrl ? (
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <a href={asset.figmaUrl} target="_blank" rel="noreferrer">
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open
+              </a>
+            </Button>
+            {canEdit && figma === "disconnected" ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/settings#figma" title="Connect your Figma account to re-sync this design">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Connect
+                </Link>
+              </Button>
+            ) : null}
+            {canEdit && figma === "connected" ? (
+              <Button variant="outline" size="sm" onClick={handleResync} disabled={isSyncing}>
+                {isSyncing ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                Re-sync
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
 
         {canEdit ? (
           <div className="grid grid-cols-2 gap-2">

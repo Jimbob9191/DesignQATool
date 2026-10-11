@@ -7,8 +7,10 @@ import { getAppOrigin } from "@/lib/app-origin";
 import { assetDisplayName } from "@/lib/assets/name";
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import { getAssetComparisonNames } from "@/lib/assets/usage";
-import { getCurrentTeam, redirectToOwningTeam } from "@/lib/auth/team";
+import { getCurrentTeam, redirectToOwningTeam, requireUser } from "@/lib/auth/team";
 import { db } from "@/lib/db";
+import { getFigmaImportState } from "@/lib/figma/connection";
+import { figmaFrameUrl } from "@/lib/figma/links";
 import { assets, captures, comparisons, pages, projects } from "@/lib/db/schema";
 import { bridgeSnippet } from "@/lib/live/protocol";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +29,8 @@ export default async function PageDetailPage({
   const { projectSlug, pageId } = await params;
   const { team, role } = await getCurrentTeam();
   const canEdit = role !== "viewer";
+  const user = await requireUser();
+  const figmaState = canEdit ? await getFigmaImportState(user.id) : "disabled";
 
   const [row] = await db
     .select({ page: pages, project: projects })
@@ -140,7 +144,7 @@ export default async function PageDetailPage({
       <div>
         <h2 className="mb-3 text-lg font-medium">Designs</h2>
         <div className="flex flex-col gap-4">
-          {canEdit ? <UploadDropzone defaultPageId={pageId} /> : null}
+          {canEdit ? <UploadDropzone defaultPageId={pageId} figma={figmaState} /> : null}
           {designAssets.length > 0 ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {designAssets.map((asset) => (
@@ -154,10 +158,15 @@ export default async function PageDetailPage({
                     height: asset.height,
                     pageId: asset.pageId,
                     signedUrl: signedUrls.get(asset.storagePath) ?? null,
+                    figmaUrl:
+                      asset.figmaFileKey && asset.figmaNodeId
+                        ? figmaFrameUrl({ fileKey: asset.figmaFileKey, nodeId: asset.figmaNodeId })
+                        : null,
                     comparisonNames: comparisonNames.get(asset.id) ?? [],
                   }}
                   pageOptions={[{ id: pageId, label: row.page.name }]}
                   canEdit={canEdit}
+                  figma={figmaState}
                 />
               ))}
             </div>

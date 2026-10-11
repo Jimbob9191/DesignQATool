@@ -1,13 +1,16 @@
 import { getNotificationPreferences } from "@/lib/actions/preferences";
 import { requireUser } from "@/lib/auth/team";
+import { getFigmaConnection, isFigmaEnabled } from "@/lib/figma/connection";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChangePasswordForm } from "@/components/settings/change-password-form";
+import { FigmaConnectionForm } from "@/components/settings/figma-connection-form";
 import { DeleteAccountDialog } from "@/components/settings/delete-account-dialog";
 import { NotificationPreferencesForm } from "@/components/settings/notification-preferences-form";
 
 export default async function SettingsPage() {
   const [user, preferences] = await Promise.all([requireUser(), getNotificationPreferences()]);
   const email = user.email ?? "";
+  const figma = isFigmaEnabled() ? await getFigmaConnection(user.id) : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -24,6 +27,21 @@ export default async function SettingsPage() {
           <NotificationPreferencesForm initialPreferences={preferences} />
         </CardContent>
       </Card>
+
+      {isFigmaEnabled() ? (
+        <Card id="figma">
+          <CardHeader>
+            <CardTitle className="text-base">Figma</CardTitle>
+            <CardDescription>
+              Import frames straight from Figma as the design side of a comparison, and re-sync
+              them when the design changes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FigmaConnectionForm handle={figma?.handle ?? null} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

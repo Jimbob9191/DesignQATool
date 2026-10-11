@@ -10,6 +10,8 @@ import type { ElementMapEntry } from "@/lib/annotations/hit-test";
 import { getCurrentUser, getCurrentTeam, redirectToOwningTeam } from "@/lib/auth/team";
 import { FORMER_MEMBER, guestAuthor } from "@/lib/authors";
 import { db } from "@/lib/db";
+import { getFigmaImportState } from "@/lib/figma/connection";
+import { figmaFrameUrl } from "@/lib/figma/links";
 import {
   annotations,
   assets,
@@ -28,6 +30,7 @@ import { ComparisonWorkspace, type WorkspaceLiveSide } from "@/components/compar
 import { Breadcrumbs } from "@/components/app-shell/breadcrumbs";
 import { ComparisonActionsMenu } from "@/components/comparisons/comparison-actions-menu";
 import { ComparisonSwitcher } from "@/components/comparisons/comparison-switcher";
+import { FigmaSyncButton } from "@/components/comparisons/figma-sync-button";
 import { RefreshCaptureButton } from "@/components/comparisons/refresh-capture-button";
 
 export default async function ComparisonDetailPage({
@@ -271,6 +274,14 @@ export default async function ComparisonDetailPage({
           <>
             {canEdit && hasNewerCapture && latestCapture ? (
               <RefreshCaptureButton comparisonId={comparisonId} newCaptureAssetId={latestCapture.assetId} />
+            ) : null}
+            {row.design.figmaFileKey && row.design.figmaNodeId ? (
+              <FigmaSyncButton
+                assetId={row.design.id}
+                figmaUrl={figmaFrameUrl({ fileKey: row.design.figmaFileKey, nodeId: row.design.figmaNodeId })}
+                canEdit={canEdit}
+                figma={await getFigmaImportState(user.id)}
+              />
             ) : null}
             <ComparisonActionsMenu
               comparisonId={comparisonId}
