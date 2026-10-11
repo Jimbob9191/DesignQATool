@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 
 import { authorizeTeamRole, isUuid, type ActionResult } from "@/lib/actions/result";
+import { assertPageInTeam } from "@/lib/assets/page-in-team";
 import { getCurrentUser } from "@/lib/auth/team";
 import { db } from "@/lib/db";
-import { assets, pages, projects } from "@/lib/db/schema";
+import { assets } from "@/lib/db/schema";
 import { ASSETS_BUCKET, createAdminClient } from "@/lib/supabase/admin";
 import {
   confirmUploadSchema,
@@ -29,19 +30,6 @@ function extensionFor(mime: string): string {
     default:
       return "bin";
   }
-}
-
-async function assertPageInTeam(pageId: string, teamId: string): Promise<ActionResult<true>> {
-  const [page] = await db
-    .select({ id: pages.id })
-    .from(pages)
-    .innerJoin(projects, eq(pages.projectId, projects.id))
-    .where(and(eq(pages.id, pageId), eq(projects.teamId, teamId)))
-    .limit(1);
-  if (!page) {
-    return { success: false, error: "Page not found." };
-  }
-  return { success: true, data: true };
 }
 
 export async function requestUploadUrl(

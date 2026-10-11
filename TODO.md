@@ -123,6 +123,39 @@ Nothing open.
 
 ---
 
+### [ ] 37. Figma: public OAuth app ("Connect Figma" button)
+**P2 · M–L · Touches:** `src/lib/figma/connection.ts`, `src/lib/figma/api.ts`, new `src/app/api/figma/oauth/{start,callback}/route.ts`, `src/components/settings/figma-connection-form.tsx`, `src/lib/env.ts`
+
+**Problem:** Figma import only takes a personal access token, which users have to generate in Figma's settings and paste in. A one-click "Connect Figma" needs an OAuth app, and since Nov 2025 a *public* OAuth app (one anyone outside our own Figma team/org can authorize) must pass Figma's app review first. Private apps skip review but only work for members of the team/org that owns them.
+
+**Do:**
+- Register the app at figma.com/developers/apps with only the `file_content:read` and `file_metadata:read` scopes, and submit it for review. **Ask the user before submitting** — it's outward-facing and the listing is public.
+- Add the authorization-code flow with PKCE (S256 only) and a signed `state`, plus `FIGMA_CLIENT_ID`, `FIGMA_CLIENT_SECRET` and the redirect URI in env. Auth codes expire after 30 seconds, so exchange immediately in the callback.
+- Store tokens in `figma_connections` with `auth_type = 'oauth'` (the enum, `refresh_token_enc` and `expires_at` already exist, so no migration). Access tokens last 90 days: refresh in `getFigmaConnection()` shortly before `expires_at`, and once on a 401.
+- Keep the PAT form as a fallback ("Use a personal access token instead").
+
+**Done when:** a Figma user outside our org can connect in one click, and a connection whose access token has expired keeps working without them noticing.
+
+---
+
+### [ ] 38. Figma re-sync: keep design-side pins in place, and show who synced
+**P2 · M · Touches:** `src/lib/actions/figma.ts`, `src/lib/db/schema/{assets,annotations}.ts`, `src/components/comparisons/figma-sync-button.tsx`, the comparison viewer · 🗄️ if anchoring pins to nodes
+
+**Problem:**
+- Design-side pins store `y_px` in the design image's own pixels (`annotations.ts:60-61`). When a re-sync changes the frame's height — a section inserted above a pin, or the render dropping from 2x to 1x because the frame grew past Figma's 32MP cap — pins drift off what they were pointing at. Today we only warn ("pins on the design may have moved").
+- Re-sync uses the caller's own Figma token, so a teammate who can't open the file in Figma can't refresh it, and nobody can see when or by whom it was last synced.
+- The "changed" dot compares *file* versions, so an edit anywhere in the file flags every frame imported from it.
+
+**Do:**
+- When only the render scale changed, rescale design-side `y_px` in the same transaction as the asset update.
+- For layout changes, consider anchoring each design pin to the Figma node under it at creation time: `/v1/files/:key/nodes` with a deeper `depth` returns child bounding boxes in one Tier 1 call, so re-sync can move pins with their node, the way captures re-resolved pins by element selector.
+- Record `figma_synced_by` and show "Synced by @x · 3 days ago" next to the re-sync button; give a clear message when the viewer's account can't access the file.
+- Optional: narrow the "changed" dot to the frame itself. Figma has no per-node modified time, so this means hashing the node's JSON at render time and re-fetching it to compare — a Tier 1 call, so only on demand, never on page load (View/Collab seats get about 20 a month).
+
+**Done when:** re-syncing a frame whose height changed leaves existing design pins on the same element, and the comparison shows when and by whom it was last synced.
+
+---
+
 ## P3 — polish, tooling, cleanup
 
 ### [ ] 25. Remove the dead screenshot-capture pipeline

@@ -1,10 +1,12 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 
-import { getCurrentTeam } from "@/lib/auth/team";
+import { getCurrentTeam, requireUser } from "@/lib/auth/team";
 import { assetDisplayName } from "@/lib/assets/name";
 import { getAssetSignedUrls } from "@/lib/assets/signed-url";
 import { getAssetComparisonNames } from "@/lib/assets/usage";
 import { db } from "@/lib/db";
+import { getFigmaImportState } from "@/lib/figma/connection";
+import { figmaFrameUrl } from "@/lib/figma/links";
 import { assets, pages, projects } from "@/lib/db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { AssetCard } from "@/components/assets/asset-card";
@@ -20,6 +22,8 @@ export default async function AssetsPage({
   const { page: pageFilter, kind: kindFilter } = await searchParams;
   const { team, role } = await getCurrentTeam();
   const canEdit = role !== "viewer";
+  const user = await requireUser();
+  const figmaState = canEdit ? await getFigmaImportState(user.id) : "disabled";
 
   const conditions = [eq(assets.teamId, team.id)];
   if (pageFilter === "unassigned") {
@@ -59,7 +63,7 @@ export default async function AssetsPage({
         <p className="text-muted-foreground">Design uploads and captures for your team.</p>
       </div>
 
-      {canEdit ? <UploadDropzone /> : null}
+      {canEdit ? <UploadDropzone figma={figmaState} /> : null}
 
       <AssetFilters pageOptions={pageOptions} />
 
@@ -88,10 +92,15 @@ export default async function AssetsPage({
                 height: asset.height,
                 pageId: asset.pageId,
                 signedUrl: signedUrls.get(asset.storagePath) ?? null,
+                figmaUrl:
+                  asset.figmaFileKey && asset.figmaNodeId
+                    ? figmaFrameUrl({ fileKey: asset.figmaFileKey, nodeId: asset.figmaNodeId })
+                    : null,
                 comparisonNames: comparisonNames.get(asset.id) ?? [],
               }}
               pageOptions={pageOptions}
               canEdit={canEdit}
+              figma={figmaState}
             />
           ))}
         </div>
