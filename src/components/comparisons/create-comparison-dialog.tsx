@@ -6,6 +6,7 @@ import { GitCompare } from "lucide-react";
 import { toast } from "sonner";
 
 import { createComparison } from "@/lib/actions/comparisons";
+import type { FigmaImportState } from "@/lib/figma/connection";
 import { guessViewportWidth } from "@/lib/live/viewports";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FigmaFrameField } from "@/components/assets/figma-frame-field";
 import { DesignSelect, ViewportSelect, type DesignOption } from "@/components/comparisons/comparison-fields";
 
 export function CreateComparisonDialog({
@@ -26,12 +28,14 @@ export function CreateComparisonDialog({
   pageId,
   designOptions,
   defaultUrl,
+  figma = "disabled",
   trigger,
 }: {
   projectSlug: string;
   pageId: string;
   designOptions: DesignOption[];
   defaultUrl: string;
+  figma?: FigmaImportState;
   trigger: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -50,6 +54,14 @@ export function CreateComparisonDialog({
     setDesignAssetId(id);
     const design = designOptions.find((option) => option.id === id);
     handleViewportChange(guessViewportWidth(design?.width ?? null));
+  }
+
+  // A frame imported from here is picked straight away. It isn't among the
+  // options until the refresh lands, so size the viewport from the import.
+  function handleFigmaImported(asset: { id: string; width: number }) {
+    setDesignAssetId(asset.id);
+    handleViewportChange(guessViewportWidth(asset.width));
+    router.refresh();
   }
 
   // Until someone types a name, it follows the viewport ("Desktop — 1440px").
@@ -109,13 +121,16 @@ export function CreateComparisonDialog({
 
           <div className="flex flex-col gap-1.5">
             <Label>Design</Label>
-            {designOptions.length === 0 ? (
+            {designOptions.length === 0 && !designAssetId ? (
               <p className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">
-                No designs yet — upload one on this page first, then come back here.
+                {figma === "connected"
+                  ? "No designs yet. Import a Figma frame below, or upload one on this page."
+                  : "No designs yet. Upload one on this page first, then come back here."}
               </p>
             ) : (
               <DesignSelect options={designOptions} value={designAssetId} onChange={handleDesignChange} />
             )}
+            <FigmaFrameField figma={figma} pageId={pageId} onImported={handleFigmaImported} />
           </div>
 
           <div className="flex flex-col gap-1.5">
