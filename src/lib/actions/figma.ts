@@ -126,7 +126,9 @@ function displayName(render: Render): string {
   return name.slice(0, 255);
 }
 
-export async function importFigmaFrame(input: unknown): Promise<ActionResult<{ id: string }>> {
+export async function importFigmaFrame(
+  input: unknown
+): Promise<ActionResult<{ id: string; width: number }>> {
   if (!isFigmaEnabled()) return { success: false, error: NOT_ENABLED };
   const parsed = importFigmaFrameSchema.safeParse(input);
   if (!parsed.success) {
@@ -190,10 +192,10 @@ export async function importFigmaFrame(input: unknown): Promise<ActionResult<{ i
       figmaSyncedAt: new Date(),
       createdBy: user.id,
     })
-    .returning({ id: assets.id });
+    .returning({ id: assets.id, width: assets.width });
 
   revalidatePath("/assets");
-  return { success: true, data: asset };
+  return { success: true, data: { id: asset.id, width: asset.width ?? render.width } };
 }
 
 export async function resyncFigmaAsset(

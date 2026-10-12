@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UploadCloud } from "lucide-react";
+import { Frame, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
 import { confirmUpload, requestUploadUrl } from "@/lib/actions/assets";
@@ -11,6 +11,7 @@ import { ALLOWED_ASSET_MIME_TYPES, MAX_ASSET_SIZE_BYTES } from "@/lib/validation
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import type { FigmaImportState } from "@/lib/figma/connection";
+import { Button } from "@/components/ui/button";
 import { ImportFigmaDialog } from "@/components/assets/import-figma-dialog";
 
 type UploadState = {
@@ -143,12 +144,13 @@ export function UploadDropzone({
         <p className="text-xs text-muted-foreground">PNG, JPG, WebP, GIF, or SVG — up to 25MB</p>
         {figma !== "disabled" ? (
           <ImportFigmaDialog
-            connected={figma === "connected"}
+            figma={figma}
             defaultPageId={defaultPageId}
             trigger={
-              <button type="button" className="text-sm font-medium text-primary hover:underline">
-                Or import a frame from Figma
-              </button>
+              <Button type="button" variant="outline" size="sm" className="mt-2">
+                <Frame className="h-4 w-4" />
+                Import from Figma
+              </Button>
             }
           />
         ) : null}
