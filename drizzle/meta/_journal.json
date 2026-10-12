@@ -176,6 +176,13 @@
       "when": 1791744061317,
       "tag": "0024_figma",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791801280268,
+      "tag": "0025_drop_stray_asset_project_check",
+      "breakpoints": true
     }
   ]
 }

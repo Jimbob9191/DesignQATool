@@ -60,13 +60,15 @@ export function CreateComparisonDialog({
 
   async function handleSubmit() {
     setIsSubmitting(true);
+    // Expected failures come back as results, but an unexpected server error
+    // throws; without this the button would stay disabled with no message.
     const result = await createComparison({
       pageId,
       designAssetId,
       liveUrl: liveUrl.trim(),
       viewportWidth,
       name,
-    });
+    }).catch(() => ({ success: false as const, error: "Something went wrong creating the comparison. Try again." }));
     setIsSubmitting(false);
 
     if (!result.success) {
