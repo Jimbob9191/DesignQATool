@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import type { FigmaImportState } from "@/lib/figma/connection";
 import {
@@ -41,7 +42,13 @@ export function ImportFigmaDialog({
           figma={figma}
           pageId={defaultPageId}
           autoFocus
-          onImported={() => {
+          onImport={async (pending) => {
+            const result = await pending;
+            if (!result.success) {
+              toast.error(result.error);
+              return;
+            }
+            toast.success("Frame imported from Figma");
             setOpen(false);
             router.refresh();
           }}
