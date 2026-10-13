@@ -3,28 +3,34 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 import { importFigmaFrame } from "@/lib/actions/figma";
+import type { ActionResult } from "@/lib/actions/result";
 import type { FigmaImportState } from "@/lib/figma/connection";
 import { parseFigmaLink } from "@/lib/figma/links";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+export type FigmaImport = Promise<ActionResult<{ id: string; width: number }>>;
+
 /**
  * Paste a Figma frame link and import it as a design asset. Shared by the
  * import dialog and the new-comparison dialog, which picks the new design
  * straight away. Renders nothing when Figma import isn't set up.
+ *
+ * Rendering can take a while, so onImport gets the import as soon as it
+ * starts and handles how it ends (toasts included): the new-comparison
+ * dialog can then close and let it finish in the background.
  */
 export function FigmaFrameField({
   figma,
   pageId,
-  onImported,
+  onImport,
   autoFocus = false,
 }: {
   figma: FigmaImportState;
   pageId: string | null;
-  onImported: (asset: { id: string; width: number }) => void;
+  onImport: (pending: FigmaImport) => void;
   autoFocus?: boolean;
 }) {
   const [url, setUrl] = useState("");
@@ -49,17 +55,16 @@ export function FigmaFrameField({
 
   async function handleImport() {
     if (!link?.success) return;
+    // An unexpected server error throws rather than coming back as a result.
+    const pending: FigmaImport = importFigmaFrame({ url, pageId }).catch(() => ({
+      success: false as const,
+      error: "Something went wrong importing from Figma. Try again.",
+    }));
+    onImport(pending);
     setIsImporting(true);
-    const result = await importFigmaFrame({ url, pageId });
+    const result = await pending;
     setIsImporting(false);
-
-    if (!result.success) {
-      toast.error(result.error);
-      return;
-    }
-    setUrl("");
-    toast.success("Frame imported from Figma");
-    onImported(result.data);
+    if (result.success) setUrl("");
   }
 
   return (
