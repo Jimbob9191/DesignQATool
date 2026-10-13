@@ -17,7 +17,47 @@ Baseline at the time: `npx tsc --noEmit`, `npm run lint` and `npm test` (42 test
 
 ## P1 — bugs, data loss, security
 
-Nothing open.
+### [ ] 39. Dialogs overflow when they hold long text
+**P1 · S · Touches:** `src/components/ui/dialog.tsx`, `src/components/ui/select.tsx` (or `src/components/comparisons/comparison-fields.tsx`)
+
+**Problem:** A long design filename in New/Edit comparison, or a share URL in the Share dialog, pushes the fields, the link row and the submit button out past the dialog's right edge (found in a UI sweep on 2026-10-13). `DialogContent` is a `grid` with no column template (`dialog.tsx:63`), so its one implicit column grows to the content's min-content width instead of staying at `sm:max-w-sm`. Separately, the selected value in `DesignSelect` doesn't truncate: `SelectTrigger` makes `[data-slot=select-value]` a flex row without `min-w-0`, so the `truncate` span inside it never kicks in.
+
+**Do:** add `grid-cols-1` (`minmax(0, 1fr)`) to `DialogContent`'s classes. Give the select value `min-w-0` (either in the `SelectTrigger` base classes, or on the trigger in `DesignSelect`). Injecting the grid fix in the browser cut the Edit dialog's overflow from 224px to 177px; the remainder is the select value.
+
+**Done when:** a design called `design-homepage-desktop-v2-final-FINAL-really-long-filename.png` truncates inside New comparison and Edit comparison, and a share URL truncates inside the Share dialog, with every button inside the dialog.
+
+---
+
+### [ ] 40. Long words in a comment break the whole thread
+**P1 · S · Touches:** `src/components/comments/comment-item.tsx`, `src/components/share/share-thread.tsx`
+
+**Problem:** A comment containing a long URL or any unbroken string doesn't wrap. The thread grows wider than the comment panel, so the timestamp and even ordinary words in the same comment get cut off at the panel edge. The panel's Radix `ScrollArea` lays its content out as `display: table`, which grows to the widest unbreakable content, and the body (`comment-item.tsx:89`, `share-thread.tsx:87`) has nothing that lets the browser break inside words.
+
+**Do:** add `[overflow-wrap:anywhere]` (Tailwind v4: `wrap-anywhere`) to both comment bodies. `break-words` isn't enough, because it doesn't change the min-content width the table sizes to. Injecting it in the browser took the overflow from 485px to 6px. Check what's left (likely the email + timestamp row) and fix it as well.
+
+**Done when:** a comment with a 100-character URL wraps inside the panel, and its author, timestamp and Edit/Delete stay visible, both in the app and on the share page.
+
+---
+
+### [ ] 41. Public share page is wider than a phone screen
+**P1 · S · Touches:** `src/app/share/[token]/page.tsx`
+
+**Problem:** On a 390px-wide phone, `/share/[token]` lays out at 830px, so the title, breadcrumb and design pane are cut off on the right and the page scrolls sideways. The wrapper (`page.tsx:137`) is `mx-auto … max-w-5xl` inside the root layout's `body` (`flex flex-col`). Auto margins on a column flex item stop it stretching, so it sizes to fit its content, and the content's min-content width is wider than the screen.
+
+**Do:** add `w-full` to the wrapper. Check the error/expired state in the same file (`:164`) and the print page for the same pattern.
+
+**Done when:** the share page has no horizontal scroll at 390px, and the design and live panes fit the screen width.
+
+---
+
+### [ ] 42. A project name over 60 characters can't be saved
+**P1 · S · Touches:** `src/lib/slug.ts`, `src/components/projects/project-form-dialog.tsx`, `src/lib/validations/project.ts`
+
+**Problem:** The New project dialog fills the slug from the name with `slugify()`, which doesn't cap its length. The name allows 100 characters but the slug only 60 (`validations/project.ts:6-11`), so any name that slugifies to more than 60 characters blocks the form. The only error shown is a generic "Invalid input" under a field the user never touched.
+
+**Do:** give `slugify` an optional max length and cut at 60, without leaving a trailing hyphen. Also give the `.max()` rules in `src/lib/validations/{project,page}.ts` real messages ("60 characters or fewer"). Check that `createTeam` (`actions/teams.ts:46`) still gets a sensible slug.
+
+**Done when:** a 90-character project name creates a project with a 60-character slug, and a hand-typed slug that's too long shows a clear message.
 
 ---
 
@@ -153,6 +193,19 @@ Nothing open.
 - Optional: narrow the "changed" dot to the frame itself. Figma has no per-node modified time, so this means hashing the node's JSON at render time and re-fetching it to compare — a Tier 1 call, so only on demand, never on page load (View/Collab seats get about 20 a month).
 
 **Done when:** re-syncing a frame whose height changed leaves existing design pins on the same element, and the comparison shows when and by whom it was last synced.
+
+---
+
+### [ ] 43. Dates follow the server's locale and time zone
+**P2 · S · Touches:** `src/app/(app)/projects/page.tsx`, `src/app/(app)/projects/[projectSlug]/[pageId]/page.tsx`, `src/components/comments/comment-item.tsx`, `src/components/share/share-thread.tsx`, new helper in `src/lib/`
+
+**Problem:** Server Components call `toLocaleDateString()` / `toLocaleString()` with no locale or time zone (`projects/page.tsx:98`, `[pageId]/page.tsx:233`, `:292`). They render in the server's settings, so on Vercel UK users would likely see US-format dates in UTC. Comment timestamps are client components using the browser's locale, so the same page can show `10/13/2026` in one place and `13/10/2026` in another. Rendering a locale-dependent string during SSR in a client component can also cause hydration mismatches.
+
+**Do:** add one date-formatting helper and use it everywhere. Either format on the client after mount (a tiny `<LocalTime date=…>` client component with `suppressHydrationWarning`), or pick a fixed, unambiguous format such as `13 Oct 2026, 14:05`. Pair it with task 34's relative-time change for comments.
+
+**Conflicts/depends:** overlaps with task 34 on `comment-item.tsx`.
+
+**Done when:** every date in the app uses the same format and the viewer's time zone.
 
 ---
 
@@ -303,3 +356,43 @@ Nothing open.
 **Do:** show "Comments on/off · Expires in 6 days / Expired / Never" on each link, and sort expired links last (muted) or hide them. Confirm before revoking. Copy the new link to the clipboard on create and say so in the toast.
 
 **Done when:** a user can tell their links apart, and can't revoke one by accident.
+
+---
+
+### [ ] 44. Small visual and accessibility fixes from the 2026-10-13 UI sweep
+**P3 · S · Touches:** `src/app/(auth)/*/page.tsx`, `src/components/team/accept-invitation-card.tsx`, `src/components/team/member-row.tsx`, `src/app/(app)/dashboard/page.tsx`, `src/components/comparisons/share-link-dialog.tsx`, `src/components/search/global-search.tsx`
+
+**Problem:**
+- On sign in, sign up, forgot/reset password and the invite card, the logo sits on the left while the title and description are centred. `CardHeader` is a `grid`, so the `items-center` these pages pass does nothing (`login/page.tsx:17` and the others).
+- The Team page shows the selected role in lowercase ("owner"). The dropdown items have `capitalize` but the `SelectTrigger` doesn't (`member-row.tsx:48`).
+- Dashboard activity reads "created comparison Homepage". It prints the page name instead of the comparison's name (`dashboard/page.tsx:155`; the item already carries `name`).
+- The Share dialog's copy and revoke buttons are icon-only with no `aria-label` (`share-link-dialog.tsx:89-94`).
+- On mobile, the top-bar search is so narrow its placeholder reads "Search p".
+
+**Do:** use `justify-items-center` on those `CardHeader`s; add `capitalize` to the role trigger; show "created comparison {name} on {page}"; label the two icon buttons; use a shorter placeholder below `sm` (e.g. "Search…") or collapse the field to an icon.
+
+**Done when:** each item above is fixed and checked at desktop and 390px widths.
+
+---
+
+### [ ] 45. Live pane stays on "Connecting…" on share links
+**P3 · S · Touches:** `src/components/comparison/live-pane.tsx`, `src/components/share/shared-comparison.tsx`
+
+**Problem:** On a public share link for a live comparison whose site has no bridge snippet (e.g. `https://example.com`), the live pane shows the site but its "Connecting…" badge (`live-pane.tsx:229-233`) never goes away. In the app, the same comparison switches to the "This page isn't talking to DesignParity.app" notice. The share page passes no `snippet`, so that notice is skipped, and the badge is left behind.
+
+**Do:** find out why the status stays at `loading` on the share page, and once the connection attempt gives up, hide the badge there. A small muted "Pins on the live site can't be shown" line would be enough for viewers. Don't show them the snippet.
+
+**Done when:** a share link for a site without the snippet shows no endless "Connecting…".
+
+---
+
+### [ ] 46. The connection notice covers the comments panel
+**P3 · S · Touches:** `src/components/comparison/live-pane.tsx`
+
+**Problem:** The floating "This page isn't talking to DesignParity.app" notice (`live-pane.tsx:283-287`, `fixed right-6 bottom-6 w-[602px]`) sits over the bottom of the comments panel, hiding any threads down there until it's dismissed.
+
+**Do:** while the comments panel is open, either move the notice left so it clears the panel (anchor it to the canvas rather than the window) or narrow it. Alternatively, start it collapsed to a single line that expands on click.
+
+**Conflicts/depends:** touches the same area as task 22.
+
+**Done when:** with the panel open and the notice showing, every thread in the panel can be read and clicked.
