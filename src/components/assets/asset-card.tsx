@@ -102,13 +102,14 @@ export function AssetCard({
 
   return (
     <Card className="overflow-hidden py-0">
-      <div className="flex aspect-square items-center justify-center bg-muted">
+      {/* overflow-hidden keeps a full-page design from stretching the box past its ratio; it's cropped to the top instead. */}
+      <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-muted">
         {asset.signedUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URLs; next/image's remote-pattern allowlist doesn't fit
           <img
             src={asset.signedUrl}
             alt={asset.name}
-            className="h-full w-full object-contain"
+            className="h-full w-full object-cover object-top"
             loading="lazy"
           />
         ) : (

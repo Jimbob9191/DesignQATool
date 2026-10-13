@@ -249,13 +249,13 @@ export default async function PageDetailPage({
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {pageCaptures.map(({ capture, asset }) => (
               <Card key={capture.id} className="overflow-hidden py-0">
-                <div className="flex aspect-square items-center justify-center bg-muted">
+                <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-muted">
                   {capture.status === "ready" && signedUrls.get(asset.storagePath) ? (
                     // eslint-disable-next-line @next/next/no-img-element -- private, signed, short-lived URLs
                     <img
                       src={signedUrls.get(asset.storagePath)}
                       alt={capture.url}
-                      className="h-full w-full object-contain"
+                      className="h-full w-full object-cover object-top"
                       loading="lazy"
                     />
                   ) : capture.status === "pending" ? (
